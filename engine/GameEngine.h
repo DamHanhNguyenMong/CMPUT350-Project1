@@ -9,6 +9,7 @@ class GameEngine;
 #include "EngineView.h"
 #include "GameObject.h"
 #include "MathUtil.h"
+#include "GameContext.h"
 #include <SFML/Graphics.hpp>
 
 namespace CMPUT350 {
@@ -25,12 +26,17 @@ public:
     GameEngine& operator=(const GameEngine&) = delete;  // Prevent assignment
     GameEngine& operator=(GameEngine&&) = delete;       // Prevent move-assignment
 
-    void AddGameObject(std::shared_ptr<GameObject> gameObject) override;
+    void AddGameObject(std::shared_ptr<GameObject> gameObject);
 
     void Run();
 
 private:
-    //	std::shared_ptr<sf::RenderWindow> mWindow;
+    GameContext mContext;
+    std::shared_ptr<sf::RenderWindow> mWindow;
+    // We use shared pointers because The engine shares ownership of this game object
+    std::vector<std::shared_ptr<GameObject>> mGameObjects; // objects currently in the game
+    std::vector<std::shared_ptr<GameObject>> mObjectsToAdd; // objects waiting to be added in the next frame
+
     //	std::shared_ptr<sf::Font> mFont;
 };
 
