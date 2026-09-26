@@ -1,6 +1,7 @@
 #include "GameEngine.h"
 #include "GameContext.h"
 #include "CollisionObject.h"
+#include "GraphicsObject.h"
 
 
 /// @brief
@@ -17,6 +18,7 @@ GameEngine::GameEngine(unsigned int width, unsigned int height, const std::strin
     // Create SMFL window
         mWindow = std::make_shared<sf::RenderWindow>(sf::VideoMode({width,height}), name); // the game window
         mWindow->setFramerateLimit(30); //maximum 30 FPS
+        mContext.mEngineView = this; // set engine view
 
 }
 
