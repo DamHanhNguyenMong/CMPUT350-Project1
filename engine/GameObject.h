@@ -15,6 +15,8 @@ public:
     virtual bool HandleKeyEvent(GameContext *context, char key);
     virtual bool IsAlive() const;
     virtual void Kill();
+protected:
+    bool mAlive = true; // need a way to make the object die
 };
 
 }  // namespace CMPUT350

@@ -72,9 +72,10 @@ void GameEngine::Run() {
                 mWindow->close();
             }
             else if (const auto* keyPressed = event->getIf<sf::Event::TextEntered>()) {
-                if (keyPressed->unicode == 'p') {
-
-                } 
+                // loop through each game object, handle events based on each
+                for (auto& gameObject : mGameObjects) {
+                    gameObject->HandleKeyEvent(&mContext, static_cast<char>(keyPressed->unicode)
+                );
             }
         }
 
