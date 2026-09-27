@@ -22,30 +22,25 @@ struct Point2D {
     Point2D operator+(const Point2D &other) const {
         // Overload + operator -> add this (x,y) point to the 'other' (x,y) point
         return Point2D((x + other.x), (y + other.y));
-        //return *this;
     }
 
     Point2D operator+(const float &other) const {
         // Overload + operator -> add the float value to each x and y coordinates??
         return Point2D((x + other), (y + other));
-        //return *this;
     }
 
     Point2D operator-(const Point2D &other) const {
         // Overload - operator -> subtract the (x,y) point from the 'other' (x,y) point
-        //return *this;
         return Point2D((x - other.x), (y - other.y));
     }
 
     Point2D operator-(const float &other) const {
         // Overload - operator -> subtract the float value from each the x and y coordinates
-        //return *this;
         return Point2D((x - other), (y - other));
     }
 
     Point2D operator*(const float &scalar) const {
         // Overload * operator -> multiply each of the x and y values by scalar
-        //return *this;
         return Point2D((x * scalar), (y * scalar));
     }
 
@@ -137,7 +132,6 @@ static std::ostream &operator<<(std::ostream &os, const Point2D &p) {
 
 static Point2D operator*(float number, const Point2D &rhs) {
     // Overload * operator -> multiplies point x and y values by number and returns the modified point
-    //return rhs;
     return Point2D(rhs.x*number, rhs.y*number);
 }
 
@@ -149,111 +143,92 @@ struct Line {
 
     float Length() const {
         // Calculates length of the line
-        //return 0;
         return p1.Distance(p2);
     }
 
     Point2D ClosestPoint(const Point2D &p) const {
-        // Returns whichever of p1 and p2 of the line are closest to p?
+        // Returns whichever of p1 and p2 of the line are closest to p
         // Note: If distance to p1 and p2 are the same, p1 is returned
-        //return p;
         if (p.Distance(p1) > p.Distance(p2)) { return p2; }
         else { return p1; }
     }
 
     bool Crosses(Line other, Point2D &crossingPoint) const {
-        // If this line and 'other' cross, set crossingPoint to the point where they cross and return true, otherwise return false?
+        // Based on lecture 6 and linked stack overflow
+        // Get slope vectors for each line - x = x2 - x1, y = y2 - y1
+        Point2D slopeLine = Point2D(p2.x - p1.x, p2.y - p1.y);
+        Point2D slopeOther = Point2D(other.p2.x - other.p1.x, other.p2.y - other.p1.y);
 
-        // Find orientation of each end point with respect to the other line
-        // Example: orientation of other.p1 with respect to line
-        int oline1p1 = orientation(p1, p2, other.p1);
-        int oline1p2 = orientation(p1, p2, other.p2);
-        int oline2p1 = orientation(other.p1, other.p2, p1);
-        int oline2p2 = orientation(other.p1, other.p2, p2);
+        float slopeCross = Point2D::Cross(slopeLine, slopeOther);  // Cross product of the two slopes
+        float pointDiffCross = Point2D::Cross((other.p1 - p1), slopeLine);  // Cross product of the difference of points by slope of the line
 
-        // Finds the slopes of the lines for use finding intersection points later
-        float slopeLine = (p2.y - p1.y) / (p2.x - p1.x);
-        float slopeOther = (other.p2.y - other.p1.y) / (other.p2.x - other.p1.x);
-        // Note: need to account for vertical lines and a division by zero risk
+        // Case 1: The lines are collinear and may or may not overlap
+        if (slopeCross == 0 && pointDiffCross == 0) {
+            // Represent the second's points line in terms of the first based on p1 + t0 * slopeLine
+            if (slopeLine != Point2D(0.0f, 0.0f)) { 
+                float t0 = Point2D::Dot(other.p1 - p1, slopeLine) / Point2D::Dot(slopeLine, slopeLine);
+                float t1 = Point2D::Dot(other.p2 - p1, slopeLine) / Point2D::Dot(slopeLine, slopeLine);
 
-        // If any orientations are 0, the lines projections are collinear and they may or may not intersect
-        if (oline1p1 == 0 || oline1p2 == 0 || oline2p1 == 0 || oline2p2 == 0) {
-            // Check if the lines overlap -> the x or y value of one of the lines lies between those of the other line
-            if ((fmin(p1.x, p2.x) <= other.p1.x && other.p1.x <= fmax(p1.x, p2.x)) || (fmin(p1.x, p2.x) <= other.p2.x && other.p2.x <= fmax(p1.x, p2.x)) ||
-                (fmin(p1.y, p2.y) <= other.p1.y && other.p1.y <= fmax(p1.y, p2.y)) || (fmin(p1.y, p2.y) <= other.p2.y && other.p2.y <= fmax(p1.y, p2.y))) {
-                    
-                // The lines intersect at 1 or more points; this implementation returns the midpoint of the inner two points
-                 
-                // Special case where the lines are collinear AND are completely vertical (x1 = x2 = x3 = x4)
-                if (p1.x == other.p1.x && p2.x == other.p2.x && p1.x == other.p2.x) {
-                    float upperMidpoint = fmin(fmax(p1.y, p2.y), fmax(other.p1.y, other.p2.y));  // Finds the smaller of the two largest points
-                    float lowerMidpoint = fmax(fmin(p1.y, p2.y), fmin(other.p1.y, other.p2.y));  // Finds the larger of the two smaller points
-                    crossingPoint.y = (upperMidpoint + lowerMidpoint) / 2;  // y is the middle of the two midpoints
-                    crossingPoint.x = (crossingPoint.y - p1.y) * slopeLine;  // Calculated from rearranged line equation: x = (y - b) / m
-                    // Note: need to handle the case that either or both of the lines are the same two points, and so slope would be 0
+                // If [t0, t1] intersects with [0, 1] then the lines intersect
+                // First two in the if statement check if one endpoint overlaps the other line, second two check if other fully contains line
+                if ((0 <= t0 && t0 <= 1) || (0 <= t1 && t1 <= 1) || (t0 <= 0 && t1 >= 0) || (t1 <= 0 && t0 >= 1)) {
+                    // Super duper edge case where all 4 points are the same and also not the zero vector
+                    if (p1 == p2 && p2 == other.p1 && other.p1 == other.p2) { crossingPoint = p1; return true; }
+
+                    // The lines overlap, in this implementation, return the midpoint between the two inner points
+                    float upperMidX = fmax(fmin(p1.x, p2.x), fmin(other.p1.x, other.p2.x));
+                    float lowerMidX = fmin(fmax(p1.x, p2.x), fmax(other.p1.x, other.p2.x));
+                    // Crossing point is the same x as all the other points, and the y is the middle of the two inner points
+                    crossingPoint = Point2D(p1.x, (upperMidX - lowerMidX) / 2);
+
+                    return true;  // Need to find a point to return
                 }
-                // The lines are not completely vertical
-                else { 
-                    float upperMidpoint = fmin(fmax(p1.x, p2.x), fmax(other.p1.x, other.p2.x));  // Finds the smaller of the two largest points
-                    float lowerMidpoint = fmax(fmin(p1.x, p2.x), fmin(other.p1.x, other.p2.x));  // Finds the larger of the two smaller points
-                    crossingPoint.x = (upperMidpoint + lowerMidpoint) / 2;  // x is the middle of the two midpoints
-                    crossingPoint.y = (slopeLine*crossingPoint.x) + p1.y;  // Calculated from line equation as y = mx + b
-                }
-
-                return true;
+                return false;  // Lines are collinear but do not overlap
             }
 
-            // Lines are along the same projection but do not overlap
+            // Special case: slopeLine is the zero vector - the line is either made up of two of the same point or is completely vertical
+            if (p1 == p2) {
+                if (p1 == other.p1 && other.p1 == other.p2) { crossingPoint = Point2D(); return true; } // All 4 points are just the zero vector
+
+                // The line is made up of two of the same point -> check if that point lies along the line other
+                // Represent p1 as a point on the line other: other.p1 + t0 * slopeOther = p1
+                float t0 = Point2D::Dot(p1 - other.p1, slopeOther) / Point2D::Dot(slopeOther, slopeOther);
+                if (0 <= t0 && t0 <= 1) {
+                    // p1 == p2 and it sits somewhere on other, crossing point is just p1
+                    crossingPoint = p1;
+                    return true;  // Need to find a point to return
+                }
+                return false;
+            }
             return false;
         }
-
-        // If other.p1 and other.p2 are on opposite sides of the line, and p1 and p2 are on opposite
-        // sides of other, then the lines intersect
-        if (oline1p1 != oline1p2 && oline2p1 != oline2p2) {
-            // Find the intersection point - equate line equations, then solve for x based on that:
-            // x = (other.p1.y - p1.y) / (line_slope - other_slope) -> derived from y = mx + b forms of each line
-            crossingPoint.x = (other.p1.y - p1.y) / (slopeLine - slopeOther);
-            crossingPoint.y = (slopeLine*crossingPoint.x) + p1.y;  // Plug x into line equation y = mx + b
-
-            return true;
+        
+        // Case 2: The lines are parallel and disjoint (do not overlap)
+        if (slopeCross == 0 && pointDiffCross != 0) {
+            return false;  // The lines do not overlap
         }
 
-        // Otherwise, the lines are neither collinear, nor do they intersect at a single point
-        return false;
-    }
+        // Case 3: The line segments may meet but we have to check - implicitly slopeCross != 0
+        // Calculate t = ( (other.p1 - p1) x slopeOther ) / (slopeLine x slopeOther) based on lecture notes
+        float t = (Point2D::Cross(other.p1 - p1, slopeOther) / Point2D::Cross(slopeLine, slopeOther));
+        // Calculate u = ( (other.p1 - p1.p1) x slopeLine ) / (slopeLine x slopeOther) derived based on lecture notes
+        float u = (Point2D::Cross(other.p1 - p1, slopeLine) / Point2D::Cross(slopeLine, slopeOther));
 
-    int orientation(Point2D op1, Point2D op2, Point2D op3) const {
-        // Helper function for finding orientation of 3 points
-        // References orientation of points based on: https://www.geeksforgeeks.org/dsa/orientation-3-ordered-points/
-        // Creates 'slope points' based on the slope of two given points: the x value is the change in x of the two 
-        // points and the y value is the change in y of the two points, then finds the cross product of the 'slope points'
-        // Returns:
-        //      0 if points are collinear
-        //      1 if orientation is clockwise
-        //      2 if orientation is counterclockwise
-
-        Point2D point12 = Point2D((op2.x - op1.x), (op2.y - op1.y));  // based on the slope between op1 and op2
-        Point2D point23 = Point2D((op3.x - op2.x), (op3.y - op2.y));  // based on the slope between op2 and op3
-
-        // essentially a cross product of the slope between op1 and op2, and the slope between op2 and op3
-        float crossProd = Point2D::Cross(point12, point23);
-
-        // if the crossProd of slopes is 0, the points are collinear -> their projections overlap
-        if (crossProd == 0) { return 0; }
+        // If both t and u are between 0 and 1, then the lines intersect and we can find the intersection point using t and u:
+        if (0 <= t && t <= 1 && 0 <= u && u <= 1) {
+            // Find intersection point as point where p1 + t*slopeLine = other.p1 + u*slopeOther by just pluging values into either side of that equation
+            crossingPoint = p1 + (t*slopeLine);
+            return true;
+        }
         
-        // if the crossProd < 0, the points have a clockwise orientation
-        if (crossProd < 0) { return 1; }
-
-        // if the crossProd > 0, the points have a counterclockwise orientation
-        if (crossProd > 0) { return 2; }
-
-        return 0;  // Just as a backup so the compiler is happy
+        // The lines are not parallel but they also do not intersect
+        return false;
     }
 };
 
 static std::ostream &operator<<(std::ostream &os, const Line &l) {
     // Overload << operator -> print line information to os stream
-    os << l.p1 << ", " << l.p2;
+    os << l.p1 << " -> " << l.p2;
     return os;
 }
 
@@ -286,19 +261,71 @@ struct Rect {
         : topLeft(center.x - radius, center.y - radius), width(2 * radius), height(2 * radius) {}
 
     Rect &operator|=(const Rect &other) {
-        // Overload or = operator for two rectangles
+        // Overload |= operator for two rectangles: create a new rectangle of the largest bounding box of both rectangles
+        // Find the rightmost point
+        float largestX = fmax(topLeft.x + width, other.topLeft.x + other.width);
+        float largestY = fmax(topLeft.y + height, other.topLeft.y + other.height);
+
+        // Set topLeft to leftmost and highest point
+        topLeft = Point2D(fmin(topLeft.x, other.topLeft.x), fmin(topLeft.y, other.topLeft.y));
+
+        // Set new values
+        width = largestX - topLeft.x;
+        height = largestY - topLeft.y;
+        
         return *this;
     }
+
     Rect &operator|=(const Point2D &other) {
-        // TODO: write this code
+        // Overload |= operator for a rectanlgle and another point -> return the largest bounding box of the rectangle and given point
+        if (this->IsInside(other)) {
+            return *this;  // The point is within the rectangle
+        }
+
+        // Find rightmost point
+        float largestX = fmax(topLeft.x + width, other.x);
+        float largestY = fmax(topLeft.y + height, other.y);
+
+        // Set topLeft to the smallest of the x and y values of both the rect and point
+        topLeft = Point2D(fmin(other.x, topLeft.x), fmin(other.y, topLeft.y));
+
+        // Set new values
+        width = largestX - topLeft.x;
+        height = largestY - topLeft.y;
+
         return *this;
     }
+
     Rect &operator|=(const Line &other) {
-        // TODO: write this code
+        // Overload |= operator for a rectangle and a line -> return the largest bounding box of the 6 points (4 from the rect, 2 from the line)
+        // Call |= operator for each point of line
+        *this |= other.p1;
+        *this |= other.p2;
         return *this;
     }
+
     Rect &operator&=(const Rect &other) {
-        // TODO: write this code
+        // Overload &= operator for two rects -> return the largest rect that fits completely within the other two
+
+        // Gets a point made of the larger of the two topLeft points x and y values
+        float smallestX = fmax(topLeft.x, other.topLeft.x);
+        float smallestY = fmax(topLeft.y, other.topLeft.y);
+        
+        // Gets a point made of the smallest of the rightmost / bottommost points
+        float largestX = fmin(topLeft.x + width, other.topLeft.x + other.width);
+        float largestY = fmin(topLeft.y + height, other.topLeft.y + other.height);
+
+        // Check that the rectangles actually overlap - if they dont, the 'smallest' values will be larger than the 'largest' values
+        if (smallestX > largestX || smallestY > largestY) {
+            *this = Rect();  // The rectangles don't overlap, so the returned rectangle is just 0
+            return *this;
+        }
+
+        // Set values
+        topLeft = Point2D(smallestX, smallestY);
+        width = largestX - smallestX;
+        height = largestY - smallestY;
+
         return *this;
     }
 
