@@ -109,14 +109,19 @@ void GameEngine::Run() {
                 const Rect& rectB = objB->GetBounds();
 
                 // Check if the two rectangles overlap:
-                // 1. Horizontal: Top left of A is on the left of top right of B
-                // 2. Top right of A is on the right of top left of B
-                // Same thing but vertically
+                // 1. A is completely to the LEFT of B
+                // 2. A is completely to the RIGHT of B
+                // 3. A is completely ABOVE B
+                // 4. A is completely BELOW B
 
-                if (rectA.topLeft.x < rectB.topLeft.x + rectB.width &&
-                    rectA.topLeft.x + rectA.width > rectB.topLeft.x &&
-                    rectA.topLeft.y < rectB.topLeft.y + rectB.height &&
-                    rectA.topLeft.y + rectA.height > rectB.topLeft.y) {
+                bool noCollision =
+                    rectA.topLeft.x + rectA.width <= rectB.topLeft.x ||
+                    rectB.topLeft.x + rectB.width <= rectA.topLeft.x ||
+                    rectA.topLeft.y + rectA.height <= rectB.topLeft.y ||
+                    rectB.topLeft.y + rectB.height <= rectA.topLeft.y;
+
+                if (!noCollision)
+                {
                     objA->CollisionEnter(objB);
                     objB->CollisionEnter(objA);
                 }
@@ -178,4 +183,5 @@ void GameEngine::Run() {
 //	}
 // }
 
-}  // namespace CMPUT350
+    }  // namespace CMPUT350
+}

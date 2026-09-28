@@ -42,8 +42,8 @@ bool Player::HandleKeyEvent(CMPUT350::GameContext* context, char key)
         }
 
         else if (mBullet2.expired()){
-            std::shared_ptr<Bullet> bullet = std::make_shared<Bullet>(mLocation,CMPUT350::Point2D(0, -5), true); // create new bullet
-
+            std::shared_ptr<Bullet> bullet = std::make_shared<Bullet>(CMPUT350::Point2D(mLocation.x, mLocation.y - 20),CMPUT350::Point2D(0, -5), true); // create new bullet
+            // mLocation.y - 20 so bullet shot at the rear not the center of player
             context->mEngineView->AddGameObject(bullet); // add the the game engine
             mBullet2 = bullet;
         }
