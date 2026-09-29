@@ -10,7 +10,7 @@ namespace CMPUT350 {
 
 class CollisionObject : public GraphicsObject {
 public:
-    virtual void CollisionEnter(const std::shared_ptr<CollisionObject> &obj) = 0;
+    virtual void CollisionEnter(const std::shared_ptr<CollisionObject> &obj) = 0; // pure virtual since these methods must be customized for the object in question
     virtual const Rect &GetBounds() = 0;
 };
 
