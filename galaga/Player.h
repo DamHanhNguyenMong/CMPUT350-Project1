@@ -35,7 +35,7 @@ private:
     std::weak_ptr<Bullet> mBullet2; // but just remember to have those bullets on screen
 
     static constexpr float PLAYER_SIZE = 40.0f;
-    static constexpr float PLAYER_SPEED = 5.0f;
+    static constexpr float PLAYER_SPEED = 10.0f;
 };
 
 #endif

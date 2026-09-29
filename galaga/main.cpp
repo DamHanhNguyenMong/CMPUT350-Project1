@@ -113,7 +113,7 @@ std::mt19937 Ball::gen(rd());
 
 int main()
 {
-    bool mBallSsample = false;
+    bool mBallSsample = true;
 
     if (mBallSsample)
     {

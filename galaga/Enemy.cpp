@@ -1,6 +1,8 @@
 #include "Enemy.h"
 #include "Bullet.h"
 
+static const bool DEBUG_BOUNDS = true;   // set to false to hide
+
 Enemy::Enemy(CMPUT350::Point2D loc)
 {
     // TODO: Update code
@@ -22,6 +24,7 @@ void Enemy::LateUpdate(CMPUT350::GameContext* context)
 
 bool Enemy::HandleKeyEvent(CMPUT350::GameContext* context, char key)
 {
+    return false;
 }
 
 void Enemy::RenderBackground(CMPUT350::GameContext* context)
@@ -31,6 +34,9 @@ void Enemy::RenderBackground(CMPUT350::GameContext* context)
 void Enemy::RenderForeground(CMPUT350::GameContext* context)
 {
     context->ScreenContext->DrawRect(mBounds, CMPUT350::Colors::red);
+
+    if (DEBUG_BOUNDS)
+        context->ScreenContext->FrameRect(mBounds, 1, CMPUT350::Colors::yellow);
 }
 
 void Enemy::CollisionEnter(const std::shared_ptr<CMPUT350::CollisionObject>& obj)

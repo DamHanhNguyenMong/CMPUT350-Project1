@@ -2,6 +2,8 @@
 #include "Enemy.h"
 #include "Player.h"
 
+static const bool DEBUG_BOUNDS = true;   // set to false to hide
+
 Bullet::Bullet(CMPUT350::Point2D location, CMPUT350::Point2D heading, bool player)
 {
     mLocation = location;
@@ -31,6 +33,15 @@ void Bullet::Update(CMPUT350::GameContext* context)
     //Update bounding box
     mBounds = CMPUT350::Rect(mPreviousLocation, mLocation);
 
+    // Only kill when leaving the screen in the direction of travel
+    if ((mHeading.y < 0 && mLocation.y < 0) ||
+        (mHeading.y > 0 && mLocation.y > context->ScreenContext->GetWindowHeight()) ||
+        (mHeading.x < 0 && mLocation.x < 0) ||
+        (mHeading.x > 0 && mLocation.x > context->ScreenContext->GetWindowWidth()))
+    {
+        Kill();
+    }
+
 }
 
 void Bullet::LateUpdate(CMPUT350::GameContext* context)
@@ -48,7 +59,9 @@ void Bullet::RenderBackground(CMPUT350::GameContext* context)
 
 void Bullet::RenderForeground(CMPUT350::GameContext* context)
 {
-    context->ScreenContext->DrawLine(mPreviousLocation, mLocation, 2, CMPUT350::Colors::white);
+    context->ScreenContext->DrawCircle(mLocation, 6, CMPUT350::Colors::yellow);
+    if (DEBUG_BOUNDS)
+        context->ScreenContext->FrameRect(mBounds, 1, CMPUT350::Colors::white);
 }
 
 void Bullet::CollisionEnter(const std::shared_ptr<CMPUT350::CollisionObject>& obj)

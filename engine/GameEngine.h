@@ -33,6 +33,8 @@ public:
 private:
     GameContext mContext;
     std::shared_ptr<sf::RenderWindow> mWindow;
+    std::shared_ptr<sf::Font> mFont;
+    std::shared_ptr<DrawContext> mDrawContext; // A DrawCOntect Member
     // We use shared pointers because The engine shares ownership of this game object
     std::vector<std::shared_ptr<GameObject>> mGameObjects; // objects currently in the game
     std::vector<std::shared_ptr<GameObject>> mObjectsToAdd; // objects waiting to be added in the next frame
