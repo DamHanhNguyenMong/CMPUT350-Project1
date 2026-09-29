@@ -153,10 +153,21 @@ struct Line {
     }
 
     Point2D ClosestPoint(const Point2D &p) const {
-        // Returns whichever of p1 and p2 of the line are closest to p
-        // Note: If distance to p1 and p2 are the same, p1 is returned
-        if (p.Distance(p1) > p.Distance(p2)) { return p2; }
-        else { return p1; }
+        // Returns the closest point on the line to p
+        // Just in case check the points on the line are different
+        if (p1 == p2) { return p1; }
+
+        Point2D lineVector = p2 - p1;
+        Point2D pointVector = p - p1;  // Gets a direction vector from p1 to the point
+
+        // A dot B / B dot B => denominator is length squared
+        float t = Point2D::Dot(pointVector, lineVector) / Point2D::Dot(lineVector, lineVector);
+
+        // t value needs to be between 0 and 1 otherwise it goes off the line - t is a parameterization
+        if (t < 0) { t = 0; }
+        else if (t > 1) { t = 1; }
+
+        return (p1 + lineVector * t);
     }
 
     bool Crosses(Line other, Point2D &crossingPoint) const {
