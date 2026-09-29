@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <algorithm>  // for std::min
 
 namespace CMPUT350 {
 
@@ -25,12 +26,12 @@ struct Point2D {
     }
 
     Point2D operator+(const float &other) const {
-        // Overload + operator -> add the float value to each x and y coordinates??
+        // Overload + operator -> add the float value to each x and y coordinates
         return Point2D((x + other), (y + other));
     }
 
     Point2D operator-(const Point2D &other) const {
-        // Overload - operator -> subtract the (x,y) point from the 'other' (x,y) point
+        // Overload - operator -> subtract the 'other' (x,y) point from the (x,y) point
         return Point2D((x - other.x), (y - other.y));
     }
 
@@ -71,17 +72,22 @@ struct Point2D {
         return false;
     }
 
-    Point2D &operator*=(const int &scalar) {
+    // Note: int was changed to float as the scalar type
+    Point2D &operator*=(const float &scalar) {
         // Overload *= operator -> multiply both the x and y values by scalar
         x *= scalar;
         y *= scalar;
         return *this;
     }
 
-    Point2D &operator/=(const int &scalar) {
+    // Note: int was changed to float as the scalar type
+    Point2D &operator/=(const float &scalar) {
         // Overload /= operator -> divide both the x and y values by scalar
-        x /= scalar;
-        y /= scalar;
+        if (scalar == 0) { x = 0; y = 0; } 
+        else {
+            x /= scalar;
+            y /= scalar;
+        }
         return *this;
     }
 
@@ -105,7 +111,7 @@ struct Point2D {
     static float Cross(Point2D a, Point2D b) {
         /* 
         Gets modified cross product of the given points : a x b = (a.x)(b.y) - (b.x)(a.y)
-        Note: The magnitude of this value gives the area of the rectangle made 
+        Note: The magnitude of this value gives the area of the parallelogram made 
         from the two points as corners
         Second note: This is also the determinant of the two vectors and can be used for checking line intersection
         */
@@ -165,40 +171,36 @@ struct Line {
         // Case 1: The lines are collinear and may or may not overlap
         if (slopeCross == 0 && pointDiffCross == 0) {
             // Represent the second's points line in terms of the first based on p1 + t0 * slopeLine
-            if (slopeLine != Point2D(0.0f, 0.0f)) { 
+            if (!(slopeLine == Point2D(0, 0))) { 
                 float t0 = Point2D::Dot(other.p1 - p1, slopeLine) / Point2D::Dot(slopeLine, slopeLine);
                 float t1 = Point2D::Dot(other.p2 - p1, slopeLine) / Point2D::Dot(slopeLine, slopeLine);
 
                 // If [t0, t1] intersects with [0, 1] then the lines intersect
                 // First two in the if statement check if one endpoint overlaps the other line, second two check if other fully contains line
                 if ((0 <= t0 && t0 <= 1) || (0 <= t1 && t1 <= 1) || (t0 <= 0 && t1 >= 0) || (t1 <= 0 && t0 >= 1)) {
-                    // Super duper edge case where all 4 points are the same and also not the zero vector
-                    if (p1 == p2 && p2 == other.p1 && other.p1 == other.p2) { crossingPoint = p1; return true; }
-
                     // The lines overlap, in this implementation, return the midpoint between the two inner points
-                    float upperMidX = fmax(fmin(p1.x, p2.x), fmin(other.p1.x, other.p2.x));
-                    float lowerMidX = fmin(fmax(p1.x, p2.x), fmax(other.p1.x, other.p2.x));
-                    // Crossing point is the same x as all the other points, and the y is the middle of the two inner points
-                    crossingPoint = Point2D(p1.x, (upperMidX - lowerMidX) / 2);
+                    float upperMidpoint = fmin(1.0f, fmax(t0, t1));
+                    float lowerMidpoint = fmax(0.0f, fmin(t0, t1));
+                    crossingPoint = p1 + (slopeLine * ((lowerMidpoint + upperMidpoint) / 2.0f));  // finds crossing point from parameterization
 
-                    return true;  // Need to find a point to return
+                    return true;
                 }
                 return false;  // Lines are collinear but do not overlap
             }
 
-            // Special case: slopeLine is the zero vector - the line is either made up of two of the same point or is completely vertical
-            if (p1 == p2) {
-                if (p1 == other.p1 && other.p1 == other.p2) { crossingPoint = Point2D(); return true; } // All 4 points are just the zero vector
+             // Special case: slopeLine is the zero vector - the line is made up of two of the same point
+             // We know p1 == p2 by this point
+            if (p1 == other.p1 && other.p1 == other.p2) { crossingPoint = p1; return true; } // All 4 points are just the zero vector or the same
+            
+            if (slopeOther == Point2D(0, 0)) { return false; }  // other is different from p1 but is also just one point (don't overlap)
 
-                // The line is made up of two of the same point -> check if that point lies along the line other
-                // Represent p1 as a point on the line other: other.p1 + t0 * slopeOther = p1
-                float t0 = Point2D::Dot(p1 - other.p1, slopeOther) / Point2D::Dot(slopeOther, slopeOther);
-                if (0 <= t0 && t0 <= 1) {
-                    // p1 == p2 and it sits somewhere on other, crossing point is just p1
-                    crossingPoint = p1;
-                    return true;  // Need to find a point to return
-                }
-                return false;
+            // The line is made up of two of the same point -> check if that point lies along the line other
+            // Represent p1 as a point on the line other: other.p1 + t0 * slopeOther = p1
+            float t0 = Point2D::Dot(p1 - other.p1, slopeOther) / Point2D::Dot(slopeOther, slopeOther);
+            if (0 <= t0 && t0 <= 1) {
+                // p1 == p2 and it sits somewhere on other, crossing point is just p1
+                crossingPoint = p1;
+                return true;
             }
             return false;
         }
@@ -211,7 +213,7 @@ struct Line {
         // Case 3: The line segments may meet but we have to check - implicitly slopeCross != 0
         // Calculate t = ( (other.p1 - p1) x slopeOther ) / (slopeLine x slopeOther) based on lecture notes
         float t = (Point2D::Cross(other.p1 - p1, slopeOther) / Point2D::Cross(slopeLine, slopeOther));
-        // Calculate u = ( (other.p1 - p1.p1) x slopeLine ) / (slopeLine x slopeOther) derived based on lecture notes
+        // Calculate u = ( (other.p1 - p1) x slopeLine ) / (slopeLine x slopeOther) derived based on lecture notes
         float u = (Point2D::Cross(other.p1 - p1, slopeLine) / Point2D::Cross(slopeLine, slopeOther));
 
         // If both t and u are between 0 and 1, then the lines intersect and we can find the intersection point using t and u:
@@ -248,7 +250,7 @@ struct Rect {
     Rect(float left, float top, float width, float height)
         : topLeft(Point2D(left, top)), width(width), height(height) {}
 
-    Rect(Point2D tl = {0, 0}, int w = 0, int h = 0) : topLeft(tl), width(w), height(h) {}
+    Rect(Point2D tl = {0.0f, 0.0f}, float w = 0.0f, float h = 0.0f) : topLeft(tl), width(w), height(h) {}
 
     // Creates bounding box around p1 and p2 with positive width/height
     // Note to myself: remember 0,0 is the top left corner
@@ -317,7 +319,8 @@ struct Rect {
 
         // Check that the rectangles actually overlap - if they dont, the 'smallest' values will be larger than the 'largest' values
         if (smallestX > largestX || smallestY > largestY) {
-            *this = Rect();  // The rectangles don't overlap, so the returned rectangle is just 0
+            *this = Rect();  // The rectangles don't overlap, so the returned rectangle should reprent a null rectangle
+            this->width = -1;  // Set the width to negative to indicate that the rectangle is null
             return *this;
         }
 
@@ -337,9 +340,8 @@ struct Rect {
     }
 
     Rect operator+(const Point2D &other) const {
-        // Overload + operator -> shift entire rectangle by the point and return this as a new rectange
-        //return *this;
-        return Rect(Point2D(topLeft.x + other.x, topLeft.y + other.y), width, height);
+        // Overload + operator -> shift entire rectangle by the point and return this as a new rectangle
+        return Rect(topLeft.x + other.x, topLeft.y + other.y, width, height);
     }
 
     void Inset(float inset) {
