@@ -2,12 +2,23 @@
 #include "GameContext.h"
 #include "CollisionObject.h"
 #include "GraphicsObject.h"
-
-
-/// @brief
-namespace CMPUT350 {
+#include "DrawContext.h"
 #include "FontData.h"
 
+namespace CMPUT350 {
+
+
+/**
+ * @brief Creates and initializes the game engine.
+ *
+ * @param width The width of the game window in pixels.
+ * @param height The height of the game window in pixels.
+ * @param name The title displayed on the game window.
+ *
+ * Creates the SFML window, sets the frame rate limit, loads the game font,
+ * creates the DrawContext, and initializes the GameContext with access to
+ * the engine and drawing context.
+ */
 GameEngine::GameEngine(unsigned int width, unsigned int height, const std::string& name) {
     // Sample font loading code
     //	if (!mFont->openFromMemory(&_font, _font_len))
@@ -18,10 +29,31 @@ GameEngine::GameEngine(unsigned int width, unsigned int height, const std::strin
     // Create SMFL window
         mWindow = std::make_shared<sf::RenderWindow>(sf::VideoMode({width,height}), name); // the game window
         mWindow->setFramerateLimit(30); //maximum 30 FPS
-        mContext.mEngineView = this; // set engine view
+
+        // Create the font object used for drawing text
+        mFont = std::make_shared<sf::Font>();
+
+        // Load the embedded font data into the font object
+        if (!mFont->openFromMemory(&_font, _font_len))
+        {
+            fprintf(stderr, "Font did not load\n");
+        }
+
+        // Create the drawing context using the game window and loaded font
+        mDrawContext = std::make_shared<DrawContext>(mWindow, mFont);
+
+        // Give the game context access to the engine and drawing context
+        mContext.mEngineView = this;
+        mContext.ScreenContext = mDrawContext.get(); //get the raw pointer DrawContext*
+        // This gives GameContext access to DrawContext but GameEngine still owns it
 
 }
 
+/**
+ * @brief Destroys the game engine and closes the game window.
+ *
+ * This function releases the window resource by closing the SFML window.
+ */
 GameEngine::~GameEngine() {
     // Cleanup resources
     // mWindow->close();
@@ -31,16 +63,28 @@ GameEngine::~GameEngine() {
         }
 }
 
+/**
+ * @brief Adds a game object to the engine.
+ *
+ * @param gameObject The game object to be added.
+ *
+ * The object is placed in a temporary list and will be added and
+ * initialized at the beginning of the next game frame.
+ */
 void GameEngine::AddGameObject(std::shared_ptr<GameObject> gameObject) {
         // Objects are not to enter the game immediatly but stored in a temp vector first
         mObjectsToAdd.push_back(gameObject);
     }
 
 /**
- * @method Run
- * @arguments None
- * @description Gives control to the game engine. Will not return until the game window is closed or
- * all objects have been destroyed.
+ * @brief Runs the main game loop.
+ *
+ * This function repeatedly processes the game until the game window
+ * is closed. Each frame removes dead objects, adds newly created
+ * objects, processes input events, updates objects, checks collisions,
+ * performs late updates, and renders the game.
+ *
+ * @return void
  */
 void GameEngine::Run() {
     while (mWindow->isOpen())  // window is open
@@ -74,8 +118,8 @@ void GameEngine::Run() {
             else if (const auto* keyPressed = event->getIf<sf::Event::TextEntered>()) {
                 // loop through each game object, handle events based on each
                 for (auto& gameObject : mGameObjects) {
-                    gameObject->HandleKeyEvent(&mContext, static_cast<char>(keyPressed->unicode)
-                );
+                    gameObject->HandleKeyEvent(&mContext, static_cast<char>(keyPressed->unicode));
+                }
             }
         }
 
@@ -184,4 +228,3 @@ void GameEngine::Run() {
 // }
 
     }  // namespace CMPUT350
-}
