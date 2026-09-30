@@ -2,7 +2,7 @@
 #include "Enemy.h"
 #include "Player.h"
 
-static const bool DEBUG_BOUNDS = true;   // set to false to hide
+static const bool DEBUG_BOUNDS = false;   // set to false to hide
 
 Bullet::Bullet(CMPUT350::Point2D location, CMPUT350::Point2D heading, bool player)
 {
@@ -59,7 +59,7 @@ void Bullet::RenderBackground(CMPUT350::GameContext* context)
 
 void Bullet::RenderForeground(CMPUT350::GameContext* context)
 {
-    context->ScreenContext->DrawCircle(mLocation, 6, CMPUT350::Colors::yellow);
+    context->ScreenContext->DrawLine(mPreviousLocation, mLocation, 4, CMPUT350::Colors::yellow);
     if (DEBUG_BOUNDS)
         context->ScreenContext->FrameRect(mBounds, 1, CMPUT350::Colors::white);
 }

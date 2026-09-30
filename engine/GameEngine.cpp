@@ -103,11 +103,16 @@ void GameEngine::Run() {
         mGameObjects.swap(aliveObjects); // renew the game engine objects with the alive ones
 
         // 1. Activate and initialize any objects added during the last frame
-        for (auto& gameObject : mObjectsToAdd) {
+
+        // Since when Initialize calls AddGameObject, it does a pushback. We don't want to perform this 
+        // on a vector we are iterating. So instead we iterate on pending
+        std::vector<std::shared_ptr<GameObject>> pending;
+        pending.swap(mObjectsToAdd); // mObjectsToAdd is now empty
+
+        for (auto& gameObject : pending) {
             mGameObjects.push_back(gameObject);
             gameObject->Initialize(&mContext);
         }
-        mObjectsToAdd.clear(); // Clear the waiting 
 
 
         // 2. Process events
@@ -137,14 +142,16 @@ void GameEngine::Run() {
             std::shared_ptr<CollisionObject> objA = std::dynamic_pointer_cast<CollisionObject>(mGameObjects[a]);
 
             //If not, skip it
-            if (objA==nullptr) {
+            if (objA==nullptr || !objA->IsAlive()) {
                 continue;
             }
+            // b = a+1 since we dont want to check collision with the obj itself
             for (size_t b = a+1; b<mGameObjects.size(); ++b) {
+                if (!objA->IsAlive()) break;   // objA died earlier in this inner loop
                 // Cast to check if the obj we are checking is a collision object
                 std::shared_ptr<CollisionObject> objB = std::dynamic_pointer_cast<CollisionObject>(mGameObjects[b]);
                 //If not, skip it
-                if (objB==nullptr) {
+                if (objB==nullptr || !objB->IsAlive()) {
                     continue;
                 }
 

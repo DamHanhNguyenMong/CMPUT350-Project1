@@ -1,7 +1,7 @@
 #include "Enemy.h"
 #include "Bullet.h"
 
-static const bool DEBUG_BOUNDS = true;   // set to false to hide
+static const bool DEBUG_BOUNDS = false;   // set to false to hide
 
 Enemy::Enemy(CMPUT350::Point2D loc)
 {
