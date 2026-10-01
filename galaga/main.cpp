@@ -128,10 +128,14 @@ int main()
         auto player = std::make_shared<Player>(CMPUT350::Point2D(768 / 2, 900));
         engine.AddGameObject(player);
         engine.AddGameObject(std::make_shared<Stars>(250, CMPUT350::Rect(0, 0, 768, 1024)));
-        for (int x = 0; x < 4; x++)
-        {
-            auto enemy = std::make_shared<Enemy>(CMPUT350::Point2D(84 + x * 200, 100));
-            engine.AddGameObject(enemy);
+
+        // Creates enemies
+        float separator = (600.0f / 9.0f);  // Used for calculating the separation between enemies. Leaves 84 pixels before/after the first/last enemies
+        for (int y = 0; y < 4; ++y) {
+            for (int x = 0; x < 10; ++x){
+                auto enemy = std::make_shared<Enemy>(CMPUT350::Point2D(84 + x * separator, 100 + y * separator));
+                engine.AddGameObject(enemy);
+            }
         }
         engine.Run();
     }
