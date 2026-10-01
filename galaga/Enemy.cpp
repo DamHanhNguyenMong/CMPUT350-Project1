@@ -6,8 +6,9 @@ static const bool DEBUG_BOUNDS = false;   // set to false to hide
 Enemy::Enemy(CMPUT350::Point2D loc)
 {
     // TODO: Update code
-    mLocation=loc;
-    mBounds = CMPUT350::Rect(loc.x -20, loc.y -20, 40,40); //since loc is the center of the rect, we get top left by minus 20
+    mLocation = loc;
+    int enemyRadius = 16;  // So enemy size can be modified easier
+    mBounds = CMPUT350::Rect(loc.x - enemyRadius, loc.y - enemyRadius, enemyRadius*2, enemyRadius*2); // since loc is the center of the rect, we get top left by minus radius
 }
 
 void Enemy::Initialize(CMPUT350::GameContext* context)
