@@ -45,6 +45,14 @@ public:
 private:
     std::shared_ptr<sf::RenderWindow> mWindow;
     std::shared_ptr<sf::Font> mFont;
+
+    friend class GameEngine; // allows GameEngine to call these private methods
+	void SetContextOffset(Point2D p); // sets the object's position offset
+	void SetContextRotation(float rotation); // sets the object's rotation
+	Point2D Transform(Point2D p); // converts a point from local coordinates to screen coordinates
+	Point2D ReverseTransform(Point2D p); // converts a screen point back to local coordinates
+	Rect Transform(Rect r); // Rotates rectangle and computes new bounding box after rotation
+
 };
 
 }  // namespace CMPUT350
