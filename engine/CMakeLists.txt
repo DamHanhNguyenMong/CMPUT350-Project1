@@ -17,7 +17,8 @@ endif ()
 file(GLOB ENGINE CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
 add_library(Engine STATIC ${ENGINE}
-    Bezier.cpp)
+    Bezier.cpp
+    NotificationManager.cpp)
 
 target_include_directories(Engine INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_features(Engine PRIVATE cxx_std_20)

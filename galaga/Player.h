@@ -27,9 +27,11 @@ public:
     // Collision Object Functions
     void CollisionEnter(const std::shared_ptr<CMPUT350::CollisionObject>& obj) override;
     const CMPUT350::Rect& GetBounds() override;
+    const std::vector<CMPUT350::Shape>& GetShapes() override;
 private:
     CMPUT350::Point2D mLocation;
     CMPUT350::Rect mBounds;
+    std::vector<CMPUT350::Shape> mShapes;
 
     std::weak_ptr<Bullet> mBullet1; // weak pointers for bullet since player dont own the bullets
     std::weak_ptr<Bullet> mBullet2; // but just remember to have those bullets on screen
