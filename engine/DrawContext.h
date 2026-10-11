@@ -46,6 +46,10 @@ private:
     std::shared_ptr<sf::RenderWindow> mWindow;
     std::shared_ptr<sf::Font> mFont;
 
+    // offset and rotation
+    Point2D mOffset = Point2D();  // Initialized as (0,0)
+    float mRotation = 0.0f;  // Initialized as 0 radians
+
     friend class GameEngine; // allows GameEngine to call these private methods
 	void SetContextOffset(Point2D p); // sets the object's position offset
 	void SetContextRotation(float rotation); // sets the object's rotation
