@@ -192,4 +192,61 @@ int DrawContext::GetWindowWidth() { return mWindow->getSize().x; }
 
 int DrawContext::GetWindowHeight() { return mWindow->getSize().y; }
 
+void DrawContext::SetContextOffset(Point2D p){
+    // sets the object's position offset
+    mOffset = p;
+}
+
+void DrawContext::SetContextRotation(float rotation) {
+    // sets the object's rotation in radians
+    mRotation = rotation;
+}
+
+Point2D DrawContext::Transform(Point2D p){
+    // converts a point from local coordinates to screen coordinates
+    Point2D screenPoint = p;
+
+    // Apply offset
+    p += mOffset;
+
+    float cos = std::cos(mRotation);
+    float sin = std::sin(mRotation);
+
+    // multiplying p by rotation matrix gets: [cosθx - sinθy, sinθx + cosθy]
+    return {p.x*cos - p.y*sin, p.x*sin + p.y*cos};
+}
+
+Point2D DrawContext::ReverseTransform(Point2D p){
+    // converts a screen point back to local coordinates
+    Point2D screenPoint = p;
+
+    // Apply offset
+    p -= mOffset;
+
+    float cos = std::cos(mRotation);
+    float sin = std::sin(mRotation);
+
+    // Inverse rotation matrix: [cos, sin], [-sin, cos]
+    // Multiplying p by inverse rotation matrix gets: [cosθx + sinθy, cosθy - sinθx]
+    return {p.x*cos + p.y*sin, p.y*cos - p.y*sin};
+}
+
+Rect DrawContext::Transform(Rect r){
+    // Rotates rectangle and computes new bounding box after rotation
+    // Use transform to rotate the corners of the rect and apply offset
+    Point2D newTopLeft = Transform(r.topLeft);
+    Point2D newTopRight = Transform(r.topLeft + Point2D{r.width, 0});
+    Point2D newBottomLeft = Transform(r.topLeft + Point2D{0, r.height});
+    Point2D newBottomRight = Transform(r.topLeft + Point2D{r.width, r.height});
+
+    // find the topLeft, width, and height of the new bounding box so a rect can be constructed for it
+    Point2D boundTopLeft = {std::fmin(std::fmin(newTopLeft.x, newTopRight.x), std::fmin(newBottomLeft.x, newBottomRight.x)),
+        std::fmin(std::fmin(newTopLeft.y, newTopRight.y), std::fmin(newBottomLeft.y, newBottomRight.y))};
+        
+    float newWidth = fmax(std::fmax(newTopLeft.x, newTopRight.x), std::fmax(newBottomLeft.x, newBottomRight.x)) - boundTopLeft.x;
+    float newHeight = fmax(std::fmax(newTopLeft.y, newTopRight.y), std::fmax(newBottomLeft.y, newBottomRight.y)) - boundTopLeft.y;
+
+    return Rect(boundTopLeft, newWidth, newHeight);
+}
+
 }  // namespace CMPUT350

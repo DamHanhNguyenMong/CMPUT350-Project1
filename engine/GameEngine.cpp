@@ -336,11 +336,16 @@ void GameEngine::Run() {
         mGameObjects.swap(aliveObjects); // renew the game engine objects with the alive ones
 
         // 1. Activate and initialize any objects added during the last frame
-        for (auto& gameObject : mObjectsToAdd) {
+
+        // Since when Initialize calls AddGameObject, it does a pushback. We don't want to perform this 
+        // on a vector we are iterating. So instead we iterate on pending
+        std::vector<std::shared_ptr<GameObject>> pending;
+        pending.swap(mObjectsToAdd); // mObjectsToAdd is now empty
+
+        for (auto& gameObject : pending) {
             mGameObjects.push_back(gameObject);
             gameObject->Initialize(&mContext);
         }
-        mObjectsToAdd.clear(); // Clear the waiting 
 
 
         // 2. Process events
