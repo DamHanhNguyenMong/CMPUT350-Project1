@@ -52,10 +52,13 @@ GameEngine::GameEngine(unsigned int width, unsigned int height, const std::strin
         
         // Give the game context access to the notification manager
         mContext.mNotificationManager = &mNotificationManager;
+        
         mContext.currentFrame = 0;
         // Create a separate DrawContext for GUI elements
         mGUIContext = std::make_shared<DrawContext>(mWindow, mFont);
         mContext.GUIContext = mGUIContext.get();
+
+        mWindow->setKeyRepeatEnabled(false);
 
 }
 
@@ -140,172 +143,222 @@ EngineView::const_iterator GameEngine::end() const {
     return mGameObjects.end();
 }
 
-// Helper: Rotate a point
-Point2D RotatePoint (Point2D p, float angle) {
-    float x = p.x * std::cos(angle) - p.y * std::sin(angle);
-    float y = p.x * std::sin(angle) + p.y * std::cos(angle);
+namespace {
+    // Helper: Rotate a point
+    Point2D RotatePoint (Point2D p, float angle) {
+        float c = std::cos(angle);
+        float s = std::sin(angle);
 
-    return Point2D(x, y);
-}
-// Conver to world coordinates by rotating the point and adding the location
-Point2D ToWorld(Point2D p, Point2D location, float rotation) {
-    return location + RotatePoint(p, rotation);
-}
-
-// Helper: Circle x Circle
-bool CircleCircle(const Circle& c1, const Circle& c2) {
-    // (p1.x-p2.x)^2+(p1.y-p2.y)^2<=(r1+r2)^2
-    return c1.center.Distance(c2.center) <= c1.radius + c2.radius;
-}
-
-// Helper: Line x Circle
-bool LineCircle(const Line& line, const Circle& c) {
-    // Check distance between the p and c and the radius of the circle
-    return line.ClosestPoint(c.center).Distance(c.center) <= c.radius;
-}
-
-// Helper: Line x Line
-bool LineLine(const Line& line1, const Line& line2) {
-    Point2D crossingPoint; // This will hold the crossing point if the lines cross
-    return line1.Crosses(line2, crossingPoint);
-}
-
-// Helper: Line with width: creates an axis-aligned bounding box around the line
-Rect LineBounds(const Line& line, float width) {
-    float half = width / 2.0f;
-
-    float minX = std::min(line.p1.x, line.p2.x) - half;
-    float maxX = std::max(line.p1.x, line.p2.x) + half;
-    float minY = std::min(line.p1.y, line.p2.y) - half;
-    float maxY = std::max(line.p1.y, line.p2.y) + half;
-
-    return Rect(Point2D(minX, minY), Point2D(maxX, maxY));
-}
-
-// Helper: Get four corners of the rectangle
-std::vector<Point2D> RectCorners(const Rect& r) {
-    return {
-        r.topLeft,
-        Point2D(r.topLeft.x + r.width, r.topLeft.y),
-        Point2D(r.topLeft.x + r.width, r.topLeft.y + r.height),
-        Point2D(r.topLeft.x, r.topLeft.y + r.height)
-    };
-}
-// Helper: rotate and translate the corners
-std::vector<Point2D> WorldCorners(const Rect& r, Point2D location, float rotation) {
-    std::vector<Point2D> corners = RectCorners(r); // get the 4 corners
-
-    for (Point2D& p : corners) {
-        p = ToWorld(p, location, rotation); // rotate and translate each corner to world coordinates
+        return Point2D(p.x * c - p.y * s, p.x * s + p.y * c);
+    }
+    // Helper: Conver to world coordinates by rotating the point and adding the location
+    Point2D ToWorld(Point2D p, Point2D location, float rotation) {
+        return location + RotatePoint(p, rotation);
     }
 
-    return corners;
-}
-
-// Helper: Point inside a rotated rectangle
-bool PointInRect(Point2D p, const std::vector<Point2D>& corners) {
-    bool positive = false;
-    bool negative = false;
-    // For each edge, check the cross-product sign
-    for (int i = 0; i < 4; i++){
-        Point2D a = corners[i];
-        Point2D b = corners[(i + 1) % 4];
-
-        Point2D edge = b - a;
-        Point2D toPoint = p - a;
-
-        float cross = Point2D::Cross(edge, toPoint);
-
-        if (cross > 0) positive = true;
-        if (cross < 0) negative = true;
+    // Helper: world -> local: move back by the location, then rotate the opposite way
+    Point2D ToLocal(Point2D p, Point2D location, float rotation) {
+        return RotatePoint(p - location, -rotation);
     }
 
-    return !(positive && negative);
+    // Helper: Transform a Line
+   Line WorldLine(const Line& l, Point2D location, float rotation) {
+    return Line(ToWorld(l.p1, location, rotation), ToWorld(l.p2, location, rotation));
 }
 
-// Helper: Check if two rotated rectangles intersect
-bool SeparatedByEdge(const std::vector<Point2D>& cornersA, const std::vector<Point2D>& cornersB) {
-    // Check each edge of rectangle A to see if all points of rectangle B are on one side
-    for (int i = 0; i < 4; i++) {
-        Point2D a = cornersA[i];
-        Point2D b = cornersA[(i + 1) % 4];
+    // Helper: Transform a Circle
+    Circle WorldCircle(const Circle& c, Point2D location, float rotation) {
+        return Circle(ToWorld(c.center, location, rotation), c.radius);
+    }
 
-        Point2D edge = b - a;
+    // Helper: rotate and translate the corners
+    std::vector<Point2D> WorldCorners(const Rect& r, Point2D location, float rotation) {
+        std::vector<Point2D> corners;
+        corners.push_back(ToWorld(r.topLeft, location, rotation));
+        corners.push_back(ToWorld(Point2D(r.topLeft.x + r.width, r.topLeft.y), location, rotation));
+        corners.push_back(ToWorld(Point2D(r.topLeft.x + r.width, r.topLeft.y + r.height), location, rotation));
+        corners.push_back(ToWorld(Point2D(r.topLeft.x, r.topLeft.y + r.height), location, rotation));
+        return corners;
+    }
 
-        bool allOutside = true;
-        // Check if all points of rect B are on the side the the current edge of rect A
-        for (const Point2D& p : cornersB) {
-            if (Point2D::Cross(edge, p - a) >= 0) { 
-                allOutside = false; 
-                break; 
+    // Helper: Circle x Circle
+    bool CircleCircle(const Circle& c1, const Circle& c2) {
+        // (p1.x-p2.x)^2+(p1.y-p2.y)^2<=(r1+r2)^2
+        return c1.center.Distance(c2.center) <= c1.radius + c2.radius;
+    }
+
+    // Helper: Point inside a rotated rectangle
+    // A point is inside a (rotated) rect if it is on the same side of all 4 edges.
+    bool PointInRect(Point2D p, const std::vector<Point2D>& corners) {
+        bool positive = false;
+        bool negative = false;
+        // For each edge, check the cross-product sign
+        for (int i = 0; i < 4; i++){
+            Point2D a = corners[i];
+            Point2D b = corners[(i + 1) % 4];
+
+            Point2D edge = b - a;
+            Point2D toPoint = p - a;
+
+            float cross = Point2D::Cross(edge, toPoint);
+
+            if (cross > 0) positive = true;
+            if (cross < 0) negative = true;
+        }
+
+        return !(positive && negative);
+    }
+
+    // Helper: Check if two rotated rectangles intersect
+    bool SeparatedByEdge(const std::vector<Point2D>& cornersA, const std::vector<Point2D>& cornersB) {
+        // Check each edge of rectangle A to see if all points of rectangle B are on one side
+        for (int i = 0; i < 4; i++) {
+            Point2D a = cornersA[i];
+            Point2D b = cornersA[(i + 1) % 4];
+
+            Point2D edge = b - a;
+
+            bool allOutside = true;
+            // Check if all points of rect B are on the side the the current edge of rect A
+            for (const Point2D& p : cornersB) {
+                if (Point2D::Cross(edge, p - a) >= 0) { // this corner is inside or on the edge
+                    allOutside = false; 
+                    break; 
+                }
+            }
+            if (allOutside) return true;   // B entirely on the outer side of this edge
+        }
+        return false;
+    }
+
+    bool RectRect(const std::vector<Point2D>& cornersA, const std::vector<Point2D>& cornersB) {
+        if (SeparatedByEdge(cornersA, cornersB))
+            return false;
+
+        if (SeparatedByEdge(cornersB, cornersA))
+            return false;
+
+        return true;
+    }
+
+    // Circle x Rect
+    bool CircleRect(const Circle& c, const std::vector<Point2D>& corners) {
+        if (PointInRect(c.center, corners)) 
+            return true; // center inside the rect
+        for (int i = 0; i < 4; i++) {  // or the circle touches an edge
+            Line edge(corners[i], corners[(i + 1) % 4]);
+            // If the the center closest point to the edge is smaller than the radius then return true
+            if (edge.ClosestPoint(c.center).Distance(c.center) <= c.radius) 
+                return true;
+        }
+        return false;
+    }
+
+    // Helper: Line x Circle and return the FIRST hit point
+    bool LineCircleHit(const Line& l, const Circle& c, Point2D& hit) {
+        // Line starts inside the circle: the first contact is the start itself
+        if (l.p1.Distance(c.center) <= c.radius) { hit = l.p1; return true; }
+
+        float length = l.Length();
+        if (length == 0) 
+            return false; // a single point outside the circle
+
+        Point2D dir = (l.p2 - l.p1) * (1.0f / length); // unit direction p1 -> p2
+        float t = Point2D::Dot(c.center - l.p1, dir); // distance along the line to the point nearest the center
+        Point2D nearest = l.p1 + dir * t; // that nearest point (not clamped)
+        float d = static_cast<float>(nearest.Distance(c.center)); // Distance between the nearest point to the center
+        // If the distance larger than the radius
+        if (d > c.radius) return false; // line misses the circle
+
+        // The line enters the circle back units before the nearest point (Pythagoras)
+        // nearest is the middle of the chord that the line cuts through the circle BUT nit where the line first touches the circle
+        // The first touch (the entry point) is some distance before nearest along the line, and that distance is back
+        // So since center, nearest and the entry point form a right triangle
+        float back = std::sqrt(c.radius * c.radius - d * d);
+        float tEnter = t - back; // distance from p1 to the entry point
+        if (tEnter < 0 || tEnter > length) 
+            return false; // circle is behind p1 or beyond p2
+        // hit = l1 + distance * direction unit vector
+        hit = l.p1 + dir * tEnter;
+        return true;
+    }
+
+    // Helper: Line x rect and return the FIRST hit point
+    // The hit point is the intersect point closest to p1 among all the edges
+    bool LineRectHit(const Line& l, const std::vector<Point2D>& corners, Point2D& hit) {
+        // If the p1 inside the rect, first hit is p1
+        if (PointInRect(l.p1, corners)) { hit = l.p1; return true; }
+
+        bool found = false;
+        double bestDist = 0;
+        for (int i = 0; i < 4; i++) {
+            Line edge(corners[i], corners[(i + 1) % 4]);
+            Point2D p;
+            if (l.Crosses(edge, p)) { // If l crosses edge, p is the interesect point
+                double dist = l.p1.Distance(p); // Distance between p1 and p
+                if (!found || dist < bestDist) { // keep the crossing closest to p1
+                    bestDist = dist;
+                    hit = p;
+                    found = true;
+                }
             }
         }
-        if (allOutside) return true;   // B entirely on the outer side of this edge
-    }
-    return false;
-}
-
-bool RectRect(const std::vector<Point2D>& cornersA, const std::vector<Point2D>& cornersB) {
-    if (SeparatedByEdge(cornersA, cornersB))
-        return false;
-
-    if (SeparatedByEdge(cornersB, cornersA))
-        return false;
-
-    return true;
-}
-
-// Helper: Transform a Line
-Line WorldLine(const Line& line, Point2D location, float rotation) {
-    return Line(
-        ToWorld(line.p1, location, rotation),
-        ToWorld(line.p2, location, rotation)
-    );
-}
-
-// Helper: Transform a Circle
-Circle WorldCircle(const Circle& circle, Point2D location, float rotation) {
-    return Circle(
-        ToWorld(circle.center, location, rotation),
-        circle.radius
-    );
-}
-
-// !!! ASSSUMED THAT each shape's coordinates are local to the object's rotation center !!!
-
-// Line x Rect
-bool LineRect(const Line& line, const std::vector<Point2D>& corners) {
-    // If either endpoint is inside the rectangle, they collide
-    if (PointInRect(line.p1, corners) || PointInRect(line.p2, corners)) {
-        return true;
+        return found;
     }
 
-    // Otherwise, check whether the line crosses any rectangle edge
-    for (int i = 0; i < 4; i++) {
-        Line edge(corners[i], corners[(i + 1) % 4]);
-        // Check if the line collide with the current edge
-        if (LineLine(line, edge))
-            return true;
-    }
-    return false;
-}
-
-// Circle x Rect
-bool CircleRect(const Circle& circle, const std::vector<Point2D>& corners) {
-    // Circle center inside the rectangle
-    if (PointInRect(circle.center, corners))
-        return true;
-
-    // Check the distance to each rectangle edge.
-    for (int i = 0; i < 4; i++) {
-        Line edge(corners[i], corners[(i + 1) % 4]);
-
-        if (LineCircle(edge, circle))
-            return true;
+    // Helper: Order shapes so that Line < Circle < Rect. That way we only write 6 cases, not 9
+    int Rank(ShapeType t) {
+        if (t == ShapeType::kLine) return 0;
+        if (t == ShapeType::kCircle) return 1;
+        return 2;
     }
 
-    return false;
-}
+    // Returns true if the two shapes overlap
+    // If a line is involved, hasHit is set to true and hit holds the first
+    // contact point along that line, in WORLD coordinates
+    bool ShapesCollide(const Shape& sa, Point2D posA, float rotA,
+                    const Shape& sb, Point2D posB, float rotB,
+                    bool& hasHit, Point2D& hit) {
+        hasHit = false;
+
+        // Put the "lower" shape type first (swap A and B if needed)
+        if (Rank(sa.t) > Rank(sb.t)) {
+            return ShapesCollide(sb, posB, rotB, sa, posA, rotA, hasHit, hit);
+        }
+
+        if (sa.t == ShapeType::kLine) {
+            // Transform la
+            Line la = WorldLine(sa.shape.line, posA, rotA);
+            hasHit = true;
+            if (sb.t == ShapeType::kLine) {
+                // Transform lb
+                Line lb = WorldLine(sb.shape.line, posB, rotB);
+                // Return the hit point of the 2 lines
+                return la.Crosses(lb, hit);
+            }
+            if (sb.t == ShapeType::kCircle) {
+                // Return the hit point of the line and the circle
+                return LineCircleHit(la, WorldCircle(sb.shape.circle, posB, rotB), hit);
+            }
+            // Otherwise, return the hit point of the line and rect
+            return LineRectHit(la, WorldCorners(sb.shape.rect, posB, rotB), hit);
+        }
+
+        if (sa.t == ShapeType::kCircle) {
+            // Transform circle ca
+            Circle ca = WorldCircle(sa.shape.circle, posA, rotA);
+            if (sb.t == ShapeType::kCircle) {
+                // Return true if they collide
+                return CircleCircle(ca, WorldCircle(sb.shape.circle, posB, rotB));
+            }
+            // Return true if they collide
+            return CircleRect(ca, WorldCorners(sb.shape.rect, posB, rotB));
+        }
+
+        // Rect x Rect
+        return RectRect(WorldCorners(sa.shape.rect, posA, rotA), WorldCorners(sb.shape.rect, posB, rotB));
+    }
+} // namespace
 
 /**
  * @brief Runs the main game loop.
@@ -357,18 +410,18 @@ void GameEngine::Run() {
                 // Check if the pressed key has a registered notification
                 int key = static_cast<int>(keyPressed->code);
                 auto it = mKeyDownNotifications.find(key); // find the key in the key down notifications map
-                // If found, notify the registered objects
                 if (it != mKeyDownNotifications.end()) {
-                    mNotificationManager.Notify(it->second);
+                    for (const std::string& msg : it->second)
+                        mNotificationManager.Notify(msg);
                 }
             }
             else if (const auto* keyReleased = event->getIf<sf::Event::KeyReleased>()) {
                 // Check if the released key has a registered notification
                 int key = static_cast<int>(keyReleased->code);
-                auto it = mKeyUpNotifications.find(key);
-                // If found, notify the registered objects
+                auto it = mKeyUpNotifications.find(key); // find the key in the key down notifications map
                 if (it != mKeyUpNotifications.end()) {
-                    mNotificationManager.Notify(it->second);
+                    for (const std::string& msg : it->second)
+                        mNotificationManager.Notify(msg);
                 }
             }
         }
@@ -380,136 +433,54 @@ void GameEngine::Run() {
         }
 
         // 4. Process collision events
+        // Cast ONCE per frame, instead of inside the nested loops
+        std::vector<std::shared_ptr<CollisionObject>> colliders;
+        for (auto& gameObject : mGameObjects) {
+            std::shared_ptr<CollisionObject> c = std::dynamic_pointer_cast<CollisionObject>(gameObject);
+            if (c != nullptr) {
+                colliders.push_back(c); // all the collision objects
+            }
+        }
 
-        //Loop through each object: We comppare by pairs of objects in the vector and check if they collide
-        for (size_t a = 0; a < mGameObjects.size(); ++a) {
-            std::shared_ptr<CollisionObject> objA = std::dynamic_pointer_cast<CollisionObject>(mGameObjects[a]);
+        for (size_t a = 0; a < colliders.size(); ++a) {
+            std::shared_ptr<CollisionObject> objA = colliders[a];
 
-            if (objA == nullptr)
-                continue;
+            for (size_t b = a + 1; b < colliders.size(); ++b) { // Avoid checking colllide with themselves
+                std::shared_ptr<CollisionObject> objB = colliders[b];
 
-            // Get object A's location and rotation
-            auto graphicsA = std::dynamic_pointer_cast<GraphicsObject>(objA);
-            Point2D posA = graphicsA->GetLocation();
-            float rotA = graphicsA->GetRotation();
+                // Skip anything that already died this frame
+                if (!objA->IsAlive()) break;
+                if (!objB->IsAlive()) continue;
 
-            const auto& shapesA = objA->GetShapes();
+                // CollisionObject is already a GraphicsObject, so no second cast is needed
+                Point2D posA = objA->GetLocation();
+                Point2D posB = objB->GetLocation();
+                float rotA = objA->GetRotation();
+                float rotB = objB->GetRotation();
 
-            for (size_t b = a + 1; b < mGameObjects.size(); ++b)
-            {
-                std::shared_ptr<CollisionObject> objB = std::dynamic_pointer_cast<CollisionObject>(mGameObjects[b]);
-
-                if (objB == nullptr)
-                    continue;
-
-                // Get object B's location and rotation
-                auto graphicsB = std::dynamic_pointer_cast<GraphicsObject>(objB);
-                Point2D posB = graphicsB->GetLocation();
-                float rotB = graphicsB->GetRotation();
-
-                const auto& shapesB = objB->GetShapes();
-
-                bool objectsCollide = false;
-
-                // Compare every shape belonging to A with every shape belonging to B
-                for (const Shape& shapeA : shapesA) {
-                    for (const Shape& shapeB : shapesB) {
-                        bool collided = false;
-
-                        // Line x Line
-                        if (shapeA.t == ShapeType::kLine && shapeB.t == ShapeType::kLine) {
-                            // Transform the two lines according to their positions and rotations
-                            Line lineA = WorldLine(shapeA.shape.line, posA, rotA);
-                            Line lineB = WorldLine(shapeB.shape.line, posB, rotB);
-
-                            collided = LineLine(lineA, lineB);
-                        }
-
-                        // Line x Circle
-                        else if (shapeA.t == ShapeType::kLine && shapeB.t == ShapeType::kCircle) {
-                            Line lineA = WorldLine(shapeA.shape.line, posA, rotA);
-                            Circle circleB = WorldCircle(shapeB.shape.circle, posB, rotB);
-
-                            collided = LineCircle(lineA, circleB);
-                        }
-
-                        // Circle x Line
-                        else if (shapeA.t == ShapeType::kCircle && shapeB.t == ShapeType::kLine) {
-                            Circle circleA = WorldCircle(shapeA.shape.circle, posA, rotA);
-                            Line lineB = WorldLine(shapeB.shape.line, posB, rotB);
-
-                            collided = LineCircle(lineB, circleA);
-                        }
-
-                        // Circle x Circle
-                        else if (shapeA.t == ShapeType::kCircle && shapeB.t == ShapeType::kCircle) {
-                            Circle circleA = WorldCircle(shapeA.shape.circle, posA, rotA);
-                            Circle circleB = WorldCircle(shapeB.shape.circle, posB, rotB);
-
-                            collided = CircleCircle(circleA, circleB);
-                        }
-
-                        // Rect x Rect
-                        else if (shapeA.t == ShapeType::kRect && shapeB.t == ShapeType::kRect) {
-                            auto cornersA = WorldCorners(
-                                shapeA.shape.rect, posA, rotA);
-
-                            auto cornersB = WorldCorners(
-                                shapeB.shape.rect, posB, rotB);
-
-                            collided = RectRect(cornersA, cornersB);
-                        }
-
-                        // Line x Rect
-                        else if (shapeA.t == ShapeType::kLine && shapeB.t == ShapeType::kRect) {
-                            Line lineA = WorldLine(shapeA.shape.line, posA, rotA);
-
-                            auto cornersB = WorldCorners(
-                                shapeB.shape.rect, posB, rotB);
-
-                            collided = LineRect(lineA, cornersB);
-                        }
-
-                        // Rect x Line
-                        else if (shapeA.t == ShapeType::kRect && shapeB.t == ShapeType::kLine) {
-                            Line lineB = WorldLine(shapeB.shape.line, posB, rotB);
-
-                            auto cornersA = WorldCorners(
-                                shapeA.shape.rect, posA, rotA);
-
-                            collided = LineRect(lineB, cornersA);
-                        }
-
-                        // Circle x Rect
-                        else if (shapeA.t == ShapeType::kCircle && shapeB.t == ShapeType::kRect) {
-                            Circle circleA = WorldCircle(shapeA.shape.circle, posA, rotA);
-                            // Get the Rect corners
-                            auto cornersB = WorldCorners(shapeB.shape.rect, posB, rotB);
-
-                            collided = CircleRect(circleA, cornersB);
-                        }
-
-                        // Rect x Circle
-                        else if (shapeA.t == ShapeType::kRect && shapeB.t == ShapeType::kCircle) {
-                            Circle circleB = WorldCircle(shapeB.shape.circle, posB, rotB);
-
-                            auto cornersA = WorldCorners(shapeA.shape.rect, posA, rotA);
-
-                            collided = CircleRect(circleB, cornersA);
-                        }
-
-                        if (collided) {
-                            objectsCollide = true;
-                            break;
-                        }
+                // Compare every shape of A with every shape of B until one pair overlaps
+                bool collided = false;
+                bool hasHit = false;
+                Point2D hitWorld;
+                const std::vector<Shape>& shapesA = objA->GetShapes();
+                const std::vector<Shape>& shapesB = objB->GetShapes();
+                // Loop through each shape of A and B 
+                for (size_t i = 0; i < shapesA.size() && !collided; ++i) {
+                    for (size_t j = 0; j < shapesB.size() && !collided; ++j) {
+                        collided = ShapesCollide(shapesA[i], posA, rotA,
+                                                shapesB[j], posB, rotB,
+                                                hasHit, hitWorld);
                     }
-
-                    if (objectsCollide)
-                        break;
                 }
 
-                // Notify each object once per object pair.
-                if (objectsCollide) {
+                if (!collided) continue; // If no collision, skip the loop
+
+                // Exactly one notification per object for this pair
+                if (hasHit) {
+                    // The hit point is in world coordinates; each object gets it in its own local space
+                    objA->CollisionEnter(objB, ToLocal(hitWorld, posA, rotA));
+                    objB->CollisionEnter(objA, ToLocal(hitWorld, posB, rotB));
+                } else {
                     objA->CollisionEnter(objB);
                     objB->CollisionEnter(objA);
                 }
@@ -579,3 +550,4 @@ void GameEngine::Run() {
 // }
 
     }  // namespace CMPUT350
+    
