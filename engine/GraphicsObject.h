@@ -2,6 +2,7 @@
 #define GRAPHICS_OBJECT_H
 
 #include "GameObject.h"
+#include "MathUtil.h"
 
 namespace CMPUT350 {
 
