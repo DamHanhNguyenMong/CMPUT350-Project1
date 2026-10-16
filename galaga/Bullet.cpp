@@ -4,13 +4,18 @@
 
 static const bool DEBUG_BOUNDS = false;   // set to false to hide
 
-Bullet::Bullet(CMPUT350::Point2D location, CMPUT350::Point2D heading, bool player)
+Bullet::Bullet(CMPUT350::Point2D location, CMPUT350::Point2D heading, bool player, std::weak_ptr<CMPUT350::GameObject> parent)
+    : mLocation(location),
+      mPreviousLocation(location),  // hasn't moved yet
+      mHeading(heading),
+      mPlayerBullet(player),
+      mParent(parent),
+      mBounds(location, 0, 0)
 {
-    mLocation = location;
-    mPreviousLocation = location; //When first created, bullet hasnt moved yet
-    mHeading = heading;
-    mPlayerBullet = player;
-    mBounds = CMPUT350::Rect(location, 0, 0);
+    // Collision shape in LOCAL space: a directed line from the tail to the head
+    // Each frame the bullet moves by mHeading, so the tail is at -heading
+    CMPUT350::Point2D tail(-heading.x, -heading.y);
+    mShapes.push_back(CMPUT350::Shape(CMPUT350::Line(tail, CMPUT350::Point2D(0, 0))));
 }
 
 bool Bullet::IsPlayerBullet()
@@ -46,11 +51,17 @@ void Bullet::Update(CMPUT350::GameContext* context)
 
 void Bullet::LateUpdate(CMPUT350::GameContext* context)
 {
-}
+    // Collisions are done by now. Die if we hit something (the hit circle is
+    // still drawn this frame, because removal happens next frame)
+    if (mHit) {
+        Kill(); // kill the bullet if mHit true
+    }
 
-bool Bullet::HandleKeyEvent(CMPUT350::GameContext* context, char key)
-{
-    return false; // no key handling from bullets
+    // When the parent dies, Die with the parent
+    std::shared_ptr<CMPUT350::GameObject> parent = mParent.lock();
+    if (parent == nullptr || !parent->IsAlive()) {
+        Kill();
+    }
 }
 
 void Bullet::RenderBackground(CMPUT350::GameContext* context)
@@ -59,27 +70,61 @@ void Bullet::RenderBackground(CMPUT350::GameContext* context)
 
 void Bullet::RenderForeground(CMPUT350::GameContext* context)
 {
-    context->ScreenContext->DrawLine(mPreviousLocation, mLocation, 4, CMPUT350::Colors::yellow);
-    if (DEBUG_BOUNDS)
-        context->ScreenContext->FrameRect(mBounds, 1, CMPUT350::Colors::white);
+    // Slightly different colors for player and enemy bullets
+    CMPUT350::Point2D tail(-mHeading.x, -mHeading.y);
+    CMPUT350::RGBColor color = mPlayerBullet ? CMPUT350::RGBColor(255, 255, 0)    // yellow
+                                             : CMPUT350::RGBColor(255, 160, 0);   // orange
+    // Drawing is in LOCAL space; the engine applies the location/rotation
+    if (mHit) {
+        // After a collision, just a circle at the point of collision
+        context->ScreenContext->DrawCircle(mHitPoint, 6, color);
+    }
+    else {
+        context->ScreenContext->DrawLine(tail, CMPUT350::Point2D(0, 0), 4, color);
+    }
+
+    if (DEBUG_BOUNDS) {
+        CMPUT350::Rect localBounds(tail, CMPUT350::Point2D(0, 0));   // min/max constructor, always positive size
+        context->ScreenContext->FrameRect(localBounds, 1, CMPUT350::Colors::white);
+    }
+}
+
+CMPUT350::Point2D Bullet::GetLocation() const
+{
+    return mLocation;
+}
+
+float Bullet::GetRotation() const
+{
+    return 0.0f; // No Rotation
 }
 
 void Bullet::CollisionEnter(const std::shared_ptr<CMPUT350::CollisionObject>& obj)
 {
-    // Check which objects is the bullet colliding with
-    std::shared_ptr<Enemy> enemy = std::dynamic_pointer_cast<Enemy>(obj);
-    std::shared_ptr<Player> player = std::dynamic_pointer_cast<Player>(obj);
+    // No point supplied: treat the bullet's head (local origin) as the hit point
+    CollisionEnter(obj, CMPUT350::Point2D(0, 0));
+}
 
-    // If the bullet coming from the player and the colliding obj is an enemy
-    if (mPlayerBullet && enemy != nullptr)
-    {
-        Kill(); // kill the bullet
-        enemy->Kill(); // kill the enemy also
+void Bullet::CollisionEnter(const std::shared_ptr<CMPUT350::CollisionObject>& obj, const CMPUT350::Point2D& collisionPoint)
+{
+    // Check if the colliding obj is the parent, we dont collide with the parent
+    std::shared_ptr<CMPUT350::GameObject> parent = mParent.lock();
+    if (parent != nullptr && parent == obj) {
+        return;
     }
-    else if (!mPlayerBullet && player != nullptr) //otherwise, the colliding obj is a player and the bullet not from the player
-    {
-        Kill(); // kill the bullet
-        player->Kill(); //kill the player
+
+    // The target obj is obly valid if: Player bullets only hit enemies and enemy bullets only hit the player
+    bool validTarget =
+        (mPlayerBullet && std::dynamic_pointer_cast<Enemy>(obj) != nullptr) ||  // parent and obj are both not Enemy
+        (!mPlayerBullet && std::dynamic_pointer_cast<Player>(obj) != nullptr); // parent and obj are both not Player
+    if (!validTarget) {
+        return;
+    }
+
+    // If there are many collision point (bullet's hit point != collision point), keep the one with largest y (lowest on screen)
+    if (!mHit || collisionPoint.y > mHitPoint.y) {
+        mHitPoint = collisionPoint;
+        mHit = true;
     }
 }
 
@@ -98,4 +143,9 @@ const CMPUT350::Rect& Bullet::GetBounds()
 {
     // TODO: Update code
     return mBounds;
+}
+
+const std::vector<CMPUT350::Shape>& Bullet::GetShapes()
+{
+    return mShapes;
 }
