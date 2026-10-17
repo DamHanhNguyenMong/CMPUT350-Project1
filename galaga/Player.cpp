@@ -1,78 +1,102 @@
 #include <cassert>
 #include "Player.h"
 #include "Bullet.h"
+#include "Galaga.h"  // To use namespace GalagaNotifs
 
 static const bool DEBUG_BOUNDS = false;   // set to false to hide
 
-Player::Player(CMPUT350::Point2D loc)
+Player::Player(CMPUT350::Point2D loc) : mLocation(loc)
 {
-    // TODO: Update code
-    mLocation = loc;
-    mBounds = CMPUT350::Rect(mLocation.x - 20, mLocation.y - 20, 40, 40);
-
+    // bounds and shapes are in local coordinates
+    mBounds = CMPUT350::Rect(-PLAYER_SIZE / 2.0f, -PLAYER_SIZE / 2.0f, PLAYER_SIZE, PLAYER_SIZE);
 
 }
 
 void Player::Initialize(CMPUT350::GameContext* context)
 {
+    mContext = context;
+
+    // Register to recieve notifications
+    context->mNotificationManager->Register(context->CurrObject, PlayerNotifs::MoveLeft);
+    context->mNotificationManager->Register(context->CurrObject, PlayerNotifs::MoveRight);
+    context->mNotificationManager->Register(context->CurrObject, PlayerNotifs::StopLeft);
+    context->mNotificationManager->Register(context->CurrObject, PlayerNotifs::StopRight);
+    context->mNotificationManager->Register(context->CurrObject, PlayerNotifs::ShootBullet);
+
+    context->mNotificationManager->Register(context->CurrObject, GalagaNotifs::RemoveAll);
 }
 
-void Player::Update(CMPUT350::GameContext* context)
-{
-}
-
-void Player::LateUpdate(CMPUT350::GameContext* context)
-{
-}
-
-bool Player::HandleKeyEvent(CMPUT350::GameContext* context, char key)
-{
-    if (key == 'a' || key == 'A')
-    {
+void Player::Update(CMPUT350::GameContext* context) {
+    // Key repeat is disabled, so held down key only sends one notification to keep moving, 
+    // each moving notification just sets movement direction and update does the movement
+    if (movingLeft) {
         mLocation.x -= PLAYER_SPEED;
     }
-    else if (key == 'd' || key == 'D')
-    {
+    if (movingRight) {
         mLocation.x += PLAYER_SPEED;
     }
-    else if (key == ' ') {
-        if (mBullet1.expired()){
-            std::shared_ptr<Bullet> bullet = std::make_shared<Bullet>(mLocation,CMPUT350::Point2D(0, -10), true); // create new bullet with speed -10
 
-            context->mEngineView->AddGameObject(bullet); // add the the game engine
-            mBullet1 = bullet; //remember the bullet
-        }
+    KeepInBounds(context);
+}
 
-        else if (mBullet2.expired()){
-            std::shared_ptr<Bullet> bullet = std::make_shared<Bullet>(CMPUT350::Point2D(mLocation.x, mLocation.y - 20),CMPUT350::Point2D(0, -10), true); // create new bullet
-            // mLocation.y - 20 so bullet shot at the rear not the center of player
-            context->mEngineView->AddGameObject(bullet); // add the the game engine
-            mBullet2 = bullet;
-        }
+void Player::LateUpdate(CMPUT350::GameContext* context) {}
+
+void Player::ReceiveNotification(const std::string& key) 
+{
+    if (key == GalagaNotifs::RemoveAll) {
+        mAlive == false;
+        return;
     }
-    // Keep the ship on the screen
-    float minX = 20; //includes left rear of the ship
-    float maxX = context->ScreenContext->GetWindowWidth() - 20; // includes right rear of the ship
+    if (!mAlive) { return; } // If player is dead no need to handle other notifs
+
+    if (key == PlayerNotifs::MoveLeft) { movingLeft = true; }
+    else if (key == PlayerNotifs::MoveRight) { movingRight = true; }
+    else if (key == PlayerNotifs::StopLeft) { movingLeft = false; }
+    else if (key == PlayerNotifs::StopRight) { movingRight = false; }
+    else if (key == PlayerNotifs::ShootBullet) { Shoot(); }
+}
+
+void Player::Shoot() 
+{
+    if (mBullet1.expired()){
+        std::shared_ptr<Bullet> bullet = std::make_shared<Bullet>(CMPUT350::Point2D(mLocation.x, mLocation.y - 20),CMPUT350::Point2D(0, -10), true); // create new bullet with speed -10
+
+        mContext->mEngineView->AddGameObject(bullet); // add to the game engine
+        mBullet1 = bullet; //remember the bullet
+    }
+    else if (mBullet2.expired()){
+        std::shared_ptr<Bullet> bullet = std::make_shared<Bullet>(CMPUT350::Point2D(mLocation.x, mLocation.y - 20),CMPUT350::Point2D(0, -10), true); // create new bullet
+        // mLocation.y - 20 so bullet shot at the rear not the center of player
+        mContext->mEngineView->AddGameObject(bullet); // add to the game engine
+        mBullet2 = bullet;
+    }
+    return;
+}
+
+void Player::KeepInBounds(CMPUT350::GameContext* context)
+{
+    // Keep the ship on the screen - local coordinates
+    float minX = PLAYER_SIZE / 2.0f; 
+    float maxX = context->ScreenContext->GetWindowWidth() - PLAYER_SIZE / 2.0f;
+
     if (mLocation.x < minX) {
         mLocation.x = minX;
     }
     if (mLocation.x > maxX) {
         mLocation.x = maxX;
     }
-    // Update mBounds
-    mBounds = CMPUT350::Rect(mLocation.x -20, mLocation.y -20, 40,40);
-    return false;
+
+    // mBounds dont change no need to update them as previously was done
+    return;
 }
 
-void Player::RenderBackground(CMPUT350::GameContext* context)
-{
-}
+void Player::RenderBackground(CMPUT350::GameContext* context) {}
 
 void Player::RenderForeground(CMPUT350::GameContext* context)
 {
     auto* g = context->ScreenContext;
-    float x = mLocation.x;
-    float y = mLocation.y;
+    const float x = 0;  // Uses local coordinates, so ship is drawn around 0,0
+    const float y = 0;
 
     // Outer wings (blue) with red tips, like the Galaga fighter
     g->DrawRect(CMPUT350::Rect(x - 20, y - 8, 6, 22), CMPUT350::Colors::blue);
@@ -118,17 +142,26 @@ void Player::CollisionEnter(const std::shared_ptr<CMPUT350::CollisionObject>& ob
 
 void Player::Kill()
 {
+    if (!mAlive) { return; }  // If player is already dead, they dont need to lose another life
     mAlive = false;
+
+    mContext->mNotificationManager->Notify(GalagaNotifs::PlayerDied);
 }
 
 bool Player::IsAlive() const
 {
-    // TODO: Update code
     return mAlive;
 }
 
 const CMPUT350::Rect& Player::GetBounds()
 {
-    // TODO: Update code
     return mBounds;
+}
+
+const std::vector<CMPUT350::Shape>& Player::GetShapes()
+{
+    mShapes.push_back(CMPUT350::Shape(CMPUT350::Rect(-20, -14, 6, 28))); // left wing
+    mShapes.push_back(CMPUT350::Shape(CMPUT350::Rect( 14, -14, 6, 28))); // right wing
+    mShapes.push_back(CMPUT350::Shape(CMPUT350::Rect(-14,  -6, 28, 16))); // struts / inner wings
+    mShapes.push_back(CMPUT350::Shape(CMPUT350::Rect( -4, -20, 8, 40))); // fuselage, nose and engine
 }

@@ -3,6 +3,8 @@
 #include "Player.h"
 #include "Enemy.h"
 #include "Stars.h"
+#include "CollisionObject.h"  // For Ball Class
+#include "Galaga.h"
 
 class Ball : public CMPUT350::CollisionObject
 {
@@ -124,19 +126,9 @@ int main()
     }
     else
     {
-        CMPUT350::GameEngine engine(768, 1024, "Galaga");
-        auto player = std::make_shared<Player>(CMPUT350::Point2D(768 / 2, 900));
-        engine.AddGameObject(player);
-        engine.AddGameObject(std::make_shared<Stars>(250, CMPUT350::Rect(0, 0, 768, 1024)));
-
-        // Creates enemies
-        float separator = (600.0f / 9.0f);  // Used for calculating the separation between enemies. Leaves 84 pixels before/after the first/last enemies
-        for (int y = 0; y < 4; ++y) {
-            for (int x = 0; x < 10; ++x){
-                auto enemy = std::make_shared<Enemy>(CMPUT350::Point2D(84 + x * separator, 100 + y * separator));
-                engine.AddGameObject(enemy);
-            }
-        }
+       CMPUT350::GameEngine engine(768, 1024, "Galaga");
+        auto game = std::make_shared<Galaga>(768, 1024);
+        engine.AddGameObject(game);
         engine.Run();
     }
     return 0;
