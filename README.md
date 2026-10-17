@@ -3,6 +3,8 @@
 AI was used to assist with documentation, including brief code comments. No AI-generated code or core project functionality was used.
 AI was also used to generate the initial draft of this readme. 
 
+Referenced this website: https://www.aleksandrhovhannisyan.com/blog/implementing-a-finite-state-machine-in-cpp/
+
 ### OVERVIEW
 This is a Galaga-style arcade shooter built on the course game engine (SFML). The whole game is started by adding a single Galaga object to the engine. Galaga creates and removes every other game object itself: the stars, the player, the enemies and (through the player and enemies) the bullets.
 
