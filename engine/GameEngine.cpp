@@ -397,6 +397,7 @@ void GameEngine::Run() {
 
         for (auto& gameObject : pending) {
             mGameObjects.push_back(gameObject);
+            mContext.CurrObject = gameObject;  // Sets the current game object so it can be referenced elsewhere
             gameObject->Initialize(&mContext);
         }
 
