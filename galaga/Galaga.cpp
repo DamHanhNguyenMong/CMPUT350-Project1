@@ -1,4 +1,3 @@
-
 #include "Galaga.h"
 
 #include <SFML/Window/Keyboard.hpp>
@@ -38,8 +37,14 @@ void Galaga::Initialize(CMPUT350::GameContext* context)
 
     mContext->mNotificationManager->Register(mContext->CurrObject, GalagaNotifs::InsertCoin);
     mContext->mNotificationManager->Register(mContext->CurrObject, GalagaNotifs::StartGame);
-    mContext->mNotificationManager->Register(mContext->CurrObject, GalagaNotifs::EnemyDied);
     mContext->mNotificationManager->Register(mContext->CurrObject, GalagaNotifs::PlayerDied);
+
+    mContext->mNotificationManager->Register(mContext->CurrObject, GalagaNotifs::Enemy1DiedFormation);
+    mContext->mNotificationManager->Register(mContext->CurrObject, GalagaNotifs::Enemy1DiedAttacking);
+    mContext->mNotificationManager->Register(mContext->CurrObject, GalagaNotifs::Enemy2DiedFormation);
+    mContext->mNotificationManager->Register(mContext->CurrObject, GalagaNotifs::Enemy2DiedAttacking);
+    mContext->mNotificationManager->Register(mContext->CurrObject, GalagaNotifs::Enemy3DiedFormation);
+    mContext->mNotificationManager->Register(mContext->CurrObject, GalagaNotifs::Enemy3DiedAttacking);    
 
     // Stars are created upon initialization
     mContext->mEngineView->AddGameObject(std::make_shared<Stars>(250, CMPUT350::Rect(0, 0, width, height)));
@@ -70,11 +75,31 @@ void Galaga::RenderForeground(CMPUT350::GameContext* context)
 void Galaga::ReceiveNotification(const std::string& key)
 {
     // For every state
-    if (key == GalagaNotifs::EnemyDied) {
+    if (key == GalagaNotifs::Enemy1DiedFormation) {
         // If an enemy is killed, reduce the number of enemies alive and increase score
         --mEnemiesAlive;
+        score += 50;
+    }
+    else if (key == GalagaNotifs::Enemy1DiedAttacking) {
+        --mEnemiesAlive;
         score += 100;
-    } 
+    }
+    else if (key == GalagaNotifs::Enemy2DiedFormation) {
+        --mEnemiesAlive;
+        score += 80;
+    }
+    else if (key == GalagaNotifs::Enemy2DiedAttacking) {
+        --mEnemiesAlive;
+        score += 160;
+    }
+    else if (key == GalagaNotifs::Enemy3DiedFormation) {
+        --mEnemiesAlive;
+        score += 150;
+    }
+    else if (key == GalagaNotifs::Enemy3DiedAttacking) {
+        --mEnemiesAlive;
+        score += 300;
+    }
     else if (key == GalagaNotifs::PlayerDied) {
         // The player has died, lose a life - if all lives are lost is handled later
         mPlayerAlive = false;
@@ -116,9 +141,11 @@ void Galaga::applyState()
 // Check if enemies are all in formation or not - has an attack phase started / not yet ended?
 bool Galaga::enemyOutOfFormation() const
 {
-    for (const auto& object : *mContext->mEngineView)
-        if (auto enemy = std::dynamic_pointer_cast<Enemy>(object))
-            //if (enemy->IsAlive() && !enemy->isInFormation()) { return true; }  // NEED TO BE ADDED TO ENEMY MEOW
+    for (const auto& object : *mContext->mEngineView) {
+        if (auto enemy = std::dynamic_pointer_cast<Enemy>(object)) {
+            if (enemy->IsAlive() && !enemy->isInFormation()) { return true; } 
+        }
+    }
 
     return false;
 }
@@ -177,28 +204,45 @@ void Galaga::spawnEnemies(int wave, int indexInWave)
         enemyPosition,  // End point
     };
 
-    // MEOW ========== I NEED TO ADD TO ENEMY FILES WAY TO USE THE POINTS
-    mContext->mEngineView->AddGameObject(std::make_shared<Enemy>(enemyPosition, path));
+    std::shared_ptr<Enemy> enemy;
+    int row = slot / 10;
+    if (row == 0) {
+        enemy = std::make_shared<Enemy3>(enemyPosition, path);
+    }
+    else if (row <= 2) {
+        enemy = std::make_shared<Enemy2>(enemyPosition, path);
+    }
+    else {
+        enemy = std::make_shared<Enemy1>(enemyPosition, path);
+    }
+    mContext->mEngineView->AddGameObject(enemy);
     ++mEnemiesAlive;
 }
 
 // count is number of enemies in the attack, picks that number of enemies that are currently in formation and sends them to attack
 void Galaga::startAttack(int count)
 {
+    Point2D target(width / 2.0f, height - 100.0f);  // used if there's no player right now
+
     std::vector<std::shared_ptr<Enemy>> enemiesInFormation;
     for (const auto& object : *mContext->mEngineView) {
         // for each entity in engine view
         if (auto enemy = std::dynamic_pointer_cast<Enemy>(object)) {
-            //if (enemy->IsAlive() && enemy->isInFormation()) {  // enemy isInFormation needs to be written MEOW!!
-             //   enemiesInFormation.push_back(enemy);
-            //}
+            if (enemy->IsAlive() && enemy->isInFormation()) {
+               enemiesInFormation.push_back(enemy);
+            }
+        }
+        else if (auto player = std::dynamic_pointer_cast<Player>(object)) {
+            if (player->IsAlive()) {
+                target = player->GetLocation();
+            }
         }
     }
 
     // For each of the requested number of attackers, and while there are still enemies available to attack
     for (int e = 0; e < count && !enemiesInFormation.empty(); ++e) {
         size_t index = (mAttackCounter++ * 3) % enemiesInFormation.size();  // multiplying by 3 just makes the enemies picked more random
-        //enemiesInFormation[index]->startAttack();  // ENEMIES NEED A START ATTACK METHOD ALSO MEOW
+        enemiesInFormation[index]->Attack(mContext, target);
         // erase uses an iterator not the index itself
         enemiesInFormation.erase(enemiesInFormation.begin() + index);
     }
@@ -304,9 +348,8 @@ void GalagaWaves::update(Galaga& galaga) {
     if (mWave >= totalWaves) {
         if (!galaga.enemyOutOfFormation()) {
             galaga.setState(std::make_unique<GalagaGamePlay>());  // Request to start game play
-            return;
         }
-
+        return;
     }
 
     if (galaga.frame() < mNextSpawnFrame) { return; }  // Dont spawn things too soon after spawning previous things

@@ -6,6 +6,7 @@
 #include "CollisionObject.h"  // For Ball Class
 #include "Galaga.h"
 
+/*
 class Ball : public CMPUT350::CollisionObject
 {
 public:
@@ -112,24 +113,14 @@ private:
 // would be in a C++ file
 std::random_device Ball::rd;
 std::mt19937 Ball::gen(rd());
+*/
 
 int main()
 {
-    bool mBallSsample = false;
+    CMPUT350::GameEngine engine(768, 1024, "Galaga");
+    auto game = std::make_shared<Galaga>(768, 1024);
+    engine.AddGameObject(game);
+    engine.Run();
 
-    if (mBallSsample)
-    {
-        CMPUT350::GameEngine engine(1024, 768, "Ball Simulation");
-        engine.AddGameObject(std::make_shared<Ball>(100));
-        engine.AddGameObject(std::make_shared<Ball>(50));
-        engine.Run();
-    }
-    else
-    {
-       CMPUT350::GameEngine engine(768, 1024, "Galaga");
-        auto game = std::make_shared<Galaga>(768, 1024);
-        engine.AddGameObject(game);
-        engine.Run();
-    }
     return 0;
 }

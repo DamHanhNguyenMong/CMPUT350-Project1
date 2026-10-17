@@ -15,9 +15,15 @@
 namespace GalagaNotifs {
     const std::string InsertCoin = "InsertCoin";
     const std::string StartGame = "StartGame";
-    const std::string EnemyDied = "EnemyDied";  // sent when enemy dies
     const std::string PlayerDied = "PlayerDied";  // sent when player dies
     const std::string RemoveAll = "RemoveAll";  // sent by Galaga to remove all player/enemies
+
+    const std::string Enemy1DiedFormation = "Enemy1DiedFormation";
+    const std::string Enemy1DiedAttacking = "Enemy1DiedAttacking";
+    const std::string Enemy2DiedFormation = "Enemy2DiedFormation";
+    const std::string Enemy2DiedAttacking = "Enemy2DiedAttacking";
+    const std::string Enemy3DiedFormation = "Enemy3DiedFormation";
+    const std::string Enemy3DiedAttacking = "Enemy3DiedAttacking";
 };
 
 // Global information
@@ -25,12 +31,14 @@ constexpr int totalWaves = 5;
 constexpr int shipsPerWave = 8;
 constexpr int fps = 30;
 
+class GalagaState;
+
 // Game object - game starts with the instantiation of a galaga game object
 // Holds the current state and also relevant game information
 class Galaga : public CMPUT350::GraphicsObject
 {
 public:
-	Galaga(int width, int height) : width(width), height(height) {};
+    Galaga(int width, int height);
 
     // override game object methods
     void Initialize(CMPUT350::GameContext* context) override;
@@ -38,6 +46,9 @@ public:
     void RenderBackground(CMPUT350::GameContext* context) override {}
     void RenderForeground(CMPUT350::GameContext* context) override;
     void ReceiveNotification(const std::string& key) override;
+
+    CMPUT350::Point2D GetLocation() const override { return CMPUT350::Point2D(0, 0); }
+    float GetRotation() const override { return 0.0f; }
 
     // state machine - transition to a new state
     void setState(std::unique_ptr<GalagaState> nextState);

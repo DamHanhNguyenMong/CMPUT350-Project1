@@ -3,7 +3,15 @@
 namespace CMPUT350 {
 
 DrawContext::DrawContext(std::shared_ptr<sf::RenderWindow> window, std::shared_ptr<sf::Font> font)
-    : mWindow(window), mFont(font) {}  // Sets the window to window
+    : mWindow(window), mFont(font)  // Sets the window to window
+{
+    mOffset = Point2D(0, 0);
+    mRotation = 0.0f;
+}
+
+sf::Vector2f Point2DToVector(Point2D point) {
+    return sf::Vector2f(point.x, point.y);
+}
 
 /**
  * @brief Draws text with the given size and colour, centered around the given position
@@ -56,6 +64,7 @@ void DrawContext::DrawText(const std::string &text, int pixelSize, Point2D p, RG
 
     // Set color and position
     drawableText.setPosition(sf::Vector2f(p.x, p.y));  // Text is set to position given
+    drawableText.setRotation(sf::radians(mRotation));
     drawableText.setFillColor(sf::Color(c.r, c.g, c.b));
 
     // Draw to window
@@ -102,10 +111,13 @@ void DrawContext::DrawCircle(Point2D p, float radius, RGBColor c) {
  */
 void DrawContext::DrawRect(Rect r, RGBColor c) {
     // Draw a rectanle -> sf::RectangleShape
-    sf::RectangleShape drawableRectangle = sf::RectangleShape(sf::Vector2f (r.width, r.height)); // constructor RectangleShape (Vector2f size={})
+    sf::ConvexShape drawableRectangle = sf::ConvexShape(4);
 
     // Draws around the top left point - rect position is top left corner so coordinates dont need to be modified
-    drawableRectangle.setPosition(sf::Vector2f (r.topLeft.x, r.topLeft.y));
+    drawableRectangle.setPoint(0, Point2DToVector(Transform(r.topLeft)));
+    drawableRectangle.setPoint(1, Point2DToVector(Transform(Point2D(r.topLeft.x + r.width, r.topLeft.y))));
+    drawableRectangle.setPoint(2, Point2DToVector(Transform(Point2D(r.topLeft.x + r.width, r.topLeft.y + r.height))));
+    drawableRectangle.setPoint(3, Point2DToVector(Transform(Point2D(r.topLeft.x, r.topLeft.y + r.height))));    
     drawableRectangle.setFillColor(sf::Color (c.r, c.g, c.b));
 
     // Draw to window
@@ -129,7 +141,12 @@ void DrawContext::DrawRect(Rect r, RGBColor c) {
  */
 void DrawContext::FrameRect(Rect r, float width, RGBColor c) {
     // Draws just the outline of a rectangle
-    sf::RectangleShape drawableFrame = sf::RectangleShape(sf::Vector2f (r.width, r.height));
+    sf::ConvexShape drawableFrame = sf::ConvexShape(4);
+
+    drawableFrame.setPoint(0, Point2DToVector(Transform(r.topLeft)));
+    drawableFrame.setPoint(1, Point2DToVector(Transform(Point2D(r.topLeft.x + r.width, r.topLeft.y))));
+    drawableFrame.setPoint(2, Point2DToVector(Transform(Point2D(r.topLeft.x + r.width, r.topLeft.y + r.height))));
+    drawableFrame.setPoint(3, Point2DToVector(Transform(Point2D(r.topLeft.x, r.topLeft.y + r.height))));
 
     // Have to set a thickness and colour for the outline - there is no outline by default
     drawableFrame.setOutlineThickness(-width);
@@ -137,7 +154,6 @@ void DrawContext::FrameRect(Rect r, float width, RGBColor c) {
 
     // Remove fill colour
     drawableFrame.setFillColor(sf::Color::Transparent);
-    drawableFrame.setPosition(sf::Vector2f (r.topLeft.x, r.topLeft.y));
 
     // Draw to window
     mWindow->draw(drawableFrame);
@@ -160,19 +176,23 @@ void DrawContext::FrameRect(Rect r, float width, RGBColor c) {
 void DrawContext::DrawLine(Point2D from, Point2D to, float width, RGBColor c) {
     // Construct shape with 4 points - calculate 2 along the perpendicular line at the end of line that runs through
     // 'from' and calculate the other 2 along the perpendicular line at the end of the line that runs through 'to'
+    Point2D transformedFrom = Transform(from);
+    Point2D transformedTo = Transform(to);
+    if (transformedFrom == transformedTo) { return; }  // Nothing to draw its just a point
+    
     sf::ConvexShape drawableLine = sf::ConvexShape(4); // constructor (std::size_t pointCount=0) - set 4 points
 
     // end.x is the change in y between 'to' an 'from', end.x is the *negative* change in y
-    Point2D end = Point2D(from.y - to.y, to.x - from.x);  // -(y2 - y1) = y1 - y2
+    Point2D end = Point2D(transformedFrom.y - transformedTo.y, transformedTo.x - transformedFrom.x);  // -(y2 - y1) = y1 - y2
     // Normalize end then multiply by w / 2
     end.Normalize();
     end *= (width / 2.0f); 
 
     // 4 points, two calculated from each 'from' and 'to'
-    sf::Vector2f p1 = sf::Vector2f(from.x - end.x, from.y - end.y);  // p1 = from - end
-    sf::Vector2f p2 = sf::Vector2f(from.x + end.x, from.y + end.y);  // p2 = from + end
-    sf::Vector2f p3 = sf::Vector2f(to.x + end.x, to.y + end.y);  // p3 = to + end
-    sf::Vector2f p4 = sf::Vector2f(to.x - end.x, to.y - end.y);  // p4 = to - end
+    sf::Vector2f p1 = sf::Vector2f(transformedFrom.x - end.x, transformedFrom.y - end.y);  // p1 = from - end
+    sf::Vector2f p2 = sf::Vector2f(transformedFrom.x + end.x, transformedFrom.y + end.y);  // p2 = from + end
+    sf::Vector2f p3 = sf::Vector2f(transformedTo.x + end.x, transformedTo.y + end.y);  // p3 = to + end
+    sf::Vector2f p4 = sf::Vector2f(transformedTo.x - end.x, transformedTo.y - end.y);  // p4 = to - end
 
     // Set these 4 points to make up drawableLine
     drawableLine.setPoint(0, p1);
@@ -185,7 +205,6 @@ void DrawContext::DrawLine(Point2D from, Point2D to, float width, RGBColor c) {
 
     // Draw the line
     mWindow->draw(drawableLine);
-
 }
 
 int DrawContext::GetWindowWidth() { return mWindow->getSize().x; }
@@ -204,22 +223,16 @@ void DrawContext::SetContextRotation(float rotation) {
 
 Point2D DrawContext::Transform(Point2D p){
     // converts a point from local coordinates to screen coordinates
-    Point2D screenPoint = p;
-
-    // Apply offset
-    p += mOffset;
-
     float cos = std::cos(mRotation);
     float sin = std::sin(mRotation);
 
+    Point2D screenPoint = {p.x*cos - p.y*sin, p.x*sin + p.y*cos};
+
     // multiplying p by rotation matrix gets: [cosθx - sinθy, sinθx + cosθy]
-    return {p.x*cos - p.y*sin, p.x*sin + p.y*cos};
+    return (screenPoint + mOffset);
 }
 
 Point2D DrawContext::ReverseTransform(Point2D p){
-    // converts a screen point back to local coordinates
-    Point2D screenPoint = p;
-
     // Apply offset
     p -= mOffset;
 
@@ -228,7 +241,7 @@ Point2D DrawContext::ReverseTransform(Point2D p){
 
     // Inverse rotation matrix: [cos, sin], [-sin, cos]
     // Multiplying p by inverse rotation matrix gets: [cosθx + sinθy, cosθy - sinθx]
-    return {p.x*cos + p.y*sin, p.y*cos - p.y*sin};
+    return {p.x*cos + p.y*sin, p.y*cos - p.x*sin};
 }
 
 Rect DrawContext::Transform(Rect r){
