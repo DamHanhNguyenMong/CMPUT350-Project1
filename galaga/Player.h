@@ -48,6 +48,7 @@ private:
     void Shoot();
 
     CMPUT350::GameContext* mContext = nullptr;  // just a reference to game context
+    std::weak_ptr<CMPUT350::GameObject> mSelf;  // passed to Bullet as its "parent"
 
     CMPUT350::Point2D mLocation;
     CMPUT350::Rect mBounds;

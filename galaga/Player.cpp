@@ -2,6 +2,7 @@
 #include "Player.h"
 #include "Bullet.h"
 #include "Galaga.h"  // To use namespace GalagaNotifs
+#include "Enemy.h"
 
 static const bool DEBUG_BOUNDS = false;   // set to false to hide
 
@@ -10,11 +11,17 @@ Player::Player(CMPUT350::Point2D loc) : mLocation(loc)
     // bounds and shapes are in local coordinates
     mBounds = CMPUT350::Rect(-PLAYER_SIZE / 2.0f, -PLAYER_SIZE / 2.0f, PLAYER_SIZE, PLAYER_SIZE);
 
+    // shapes
+    mShapes.push_back(CMPUT350::Shape(CMPUT350::Rect(-20, -14, 6, 28))); // left wing
+    mShapes.push_back(CMPUT350::Shape(CMPUT350::Rect( 14, -14, 6, 28))); // right wing
+    mShapes.push_back(CMPUT350::Shape(CMPUT350::Rect(-14,  -6, 28, 16))); // struts / inner wings
+    mShapes.push_back(CMPUT350::Shape(CMPUT350::Rect( -4, -20, 8, 40))); // fuselage, nose and engine
 }
 
 void Player::Initialize(CMPUT350::GameContext* context)
 {
     mContext = context;
+    mSelf = context->CurrObject;
 
     // Register to recieve notifications
     context->mNotificationManager->Register(context->CurrObject, PlayerNotifs::MoveLeft);
@@ -44,7 +51,7 @@ void Player::LateUpdate(CMPUT350::GameContext* context) {}
 void Player::ReceiveNotification(const std::string& key) 
 {
     if (key == GalagaNotifs::RemoveAll) {
-        mAlive == false;
+        mAlive = false;
         return;
     }
     if (!mAlive) { return; } // If player is dead no need to handle other notifs
@@ -59,13 +66,13 @@ void Player::ReceiveNotification(const std::string& key)
 void Player::Shoot() 
 {
     if (mBullet1.expired()){
-        std::shared_ptr<Bullet> bullet = std::make_shared<Bullet>(CMPUT350::Point2D(mLocation.x, mLocation.y - 20),CMPUT350::Point2D(0, -10), true); // create new bullet with speed -10
+        std::shared_ptr<Bullet> bullet = std::make_shared<Bullet>(CMPUT350::Point2D(mLocation.x, mLocation.y - 20),CMPUT350::Point2D(0, -10), true, mSelf); // create new bullet with speed -10
 
         mContext->mEngineView->AddGameObject(bullet); // add to the game engine
         mBullet1 = bullet; //remember the bullet
     }
     else if (mBullet2.expired()){
-        std::shared_ptr<Bullet> bullet = std::make_shared<Bullet>(CMPUT350::Point2D(mLocation.x, mLocation.y - 20),CMPUT350::Point2D(0, -10), true); // create new bullet
+        std::shared_ptr<Bullet> bullet = std::make_shared<Bullet>(CMPUT350::Point2D(mLocation.x, mLocation.y - 20),CMPUT350::Point2D(0, -10), true, mSelf); // create new bullet
         // mLocation.y - 20 so bullet shot at the rear not the center of player
         mContext->mEngineView->AddGameObject(bullet); // add to the game engine
         mBullet2 = bullet;
@@ -131,13 +138,19 @@ void Player::RenderForeground(CMPUT350::GameContext* context)
 
 void Player::CollisionEnter(const std::shared_ptr<CMPUT350::CollisionObject>& obj)
 {
+    // player collided with an enemy
+    if (std::dynamic_pointer_cast<Enemy>(obj)) { 
+        Kill(); 
+        return; 
+    }
+
     std::shared_ptr<Bullet> bullet = std::dynamic_pointer_cast<Bullet>(obj); //check if colliding obj is a bullet
 
     if (bullet != nullptr && !bullet->IsPlayerBullet()) // if its a bullet and not from the player
     {
         Kill(); //kill player
-        bullet->Kill(); //kill bullet
     }
+
 }
 
 void Player::Kill()
@@ -160,8 +173,5 @@ const CMPUT350::Rect& Player::GetBounds()
 
 const std::vector<CMPUT350::Shape>& Player::GetShapes()
 {
-    mShapes.push_back(CMPUT350::Shape(CMPUT350::Rect(-20, -14, 6, 28))); // left wing
-    mShapes.push_back(CMPUT350::Shape(CMPUT350::Rect( 14, -14, 6, 28))); // right wing
-    mShapes.push_back(CMPUT350::Shape(CMPUT350::Rect(-14,  -6, 28, 16))); // struts / inner wings
-    mShapes.push_back(CMPUT350::Shape(CMPUT350::Rect( -4, -20, 8, 40))); // fuselage, nose and engine
+    return mShapes;
 }
