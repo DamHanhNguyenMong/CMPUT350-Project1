@@ -222,7 +222,7 @@ void Enemy::EnterFormation(int frame)
     mLocation = mPosition;
 }
 
-// To 'sway' the entire formation MEOW
+// To 'sway' the entire formation
 void Enemy::UpdateFormation(int frame)
 {
     float phase = 2.0f * PI * static_cast<float>(frame) / swayPeriod;
@@ -400,5 +400,5 @@ void Enemy3::RenderForeground(CMPUT350::GameContext* context)
     g->DrawRect(Rect(10, -16, 6, 8), CMPUT350::Colors::yellow);
     g->DrawRect(Rect(-12, -12, 24, 24), bodyColor);  // body
     g->DrawRect(Rect(-8, 8, 16, 6), CMPUT350::Colors::white);  // jaw
-    g->DrawCircle(Point2D(0, -2), 4, CMPUT350::Colors::red);  // eye
+    g->DrawCircle(Point2D(0, -2), 4, CMPUT350::Colors::white);  // eye
 }

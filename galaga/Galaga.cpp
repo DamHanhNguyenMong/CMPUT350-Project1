@@ -269,14 +269,19 @@ void Galaga::clearField()
 
 void Galaga::drawText(const std::string& text, float x, float y)
 {
-    // TODO: draw with mContext->GUIContext (engine never sets an offset on it) once I've seen DrawContext.h
-    (void)text; (void)x; (void)y;  // MEOWWW
+    mContext->GUIContext->DrawText(text, 24, Point2D(x, y), CMPUT350::Colors::white);
+}
+
+void Galaga::drawCenteredText(const std::string& text, float x, float y)
+{
+    // Draws text centered at x,y
+    mContext->GUIContext->DrawCenteredText(text, 24, Point2D(x, y), CMPUT350::Colors::white);
 }
 
 void Galaga::drawDisplay()
 {
     drawText("SCORE: " + std::to_string(score), 20, 20);
-    drawText("LIVES: " + std::to_string(lives), width - 150.0f, 20);
+    drawText("LIVES: " + std::to_string(lives), width - 210.0f, 20);
 }
 
 
@@ -306,19 +311,19 @@ void GalagaWaiting::onNotification(Galaga& galaga, const std::string& key) {
 
 // To draw text on screen
 void GalagaWaiting::draw(Galaga& galaga) {
-    galaga.drawText("GALAGA", galaga.getWidth() / 2.0f - 60, 300);
+    galaga.drawCenteredText("GALAGA", galaga.getWidth() / 2.0f, 300);
     
     if (!galaga.getCoin())
     {
         // A coin hasn't been entered yet
         galaga.drawText("Credits: 0", 20, galaga.getHeight() - 40.0f);
-        galaga.drawText("Press 5 To Insert Coin", galaga.getWidth() / 2.0f - 120, 500);
+        galaga.drawCenteredText("Press 5 To Insert Coin", galaga.getWidth() / 2.0f, galaga.getHeight() / 2.0f);
     }
     else
     {
         // There is a coin entered
         galaga.drawText("Credits = 1", 20, galaga.getHeight() - 40.0f);
-        galaga.drawText("Press 1 To Start", galaga.getWidth() / 2.0f - 120, 500);
+        galaga.drawCenteredText("Press 1 To Start", galaga.getWidth() / 2.0f, galaga.getHeight() / 2.0f);
     }
 }
 
@@ -337,7 +342,7 @@ void GalagaStartup::update(Galaga& galaga) {
 }
 
 void GalagaStartup::draw(Galaga& galaga) {
-    galaga.drawText("Level: " + std::to_string(galaga.getLevel()), galaga.getWidth() / 2.0f - 60, 500);
+    galaga.drawCenteredText("Level: " + std::to_string(galaga.getLevel()), galaga.getWidth() / 2.0f, 500);
     galaga.drawDisplay();
 }
 
@@ -393,7 +398,7 @@ void GalagaGamePlay::update(Galaga& galaga) {
 
     if (galaga.frame() >= mNextAttackFrame) {
         galaga.startAttack(2);
-        mNextAttackFrame = galaga.frame() + 2 * fps;
+        mNextAttackFrame = galaga.frame() + 4 * fps;
     }
 }
 
@@ -415,7 +420,7 @@ void GalagaRespawn::update(Galaga& galaga) {
 }
 
 void GalagaRespawn::draw(Galaga& galaga) {
-    galaga.drawText("Lives Left: " + std::to_string(galaga.getLives()), galaga.getWidth() / 2.0f - 90, 500);
+    galaga.drawCenteredText("Lives Left: " + std::to_string(galaga.getLives()), galaga.getWidth() / 2.0f, 500);
     galaga.drawDisplay();
 }
 
@@ -430,6 +435,6 @@ void GalagaGameOver::update(Galaga& galaga) {
 }
 
 void GalagaGameOver::draw(Galaga& galaga) {
-    galaga.drawText("Game Over!", galaga.getWidth() / 2.0f - 80, 450);
-    galaga.drawText("Final Score: " + std::to_string(galaga.getScore()), galaga.getWidth() / 2.0f - 100, 520);
+    galaga.drawCenteredText("Game Over!", galaga.getWidth() / 2.0f, galaga.getHeight() / 2.0f);
+    galaga.drawCenteredText("Final Score: " + std::to_string(galaga.getScore()), galaga.getWidth() / 2.0f, galaga.getHeight() / 2.0f + 100);
 }

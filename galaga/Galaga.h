@@ -83,6 +83,7 @@ public:
 
     void clearField();
     void drawText(const std::string& text, float x, float y);
+    void drawCenteredText(const std::string& text, float x, float y);
     void drawDisplay();
 
 private:

@@ -38,6 +38,7 @@ void DrawContext::DrawCenteredText(const std::string &text, int pixelSize, Point
 
     drawableText.setOrigin(sf::Vector2f(xCenter, yCenter));  // Text position is based on the center of the text
     drawableText.setPosition(sf::Vector2f(p.x, p.y));  // Text is set to position given
+    drawableText.setRotation(sf::radians(mRotation));
 
     // Add color
     drawableText.setFillColor(sf::Color(c.r, c.g, c.b));
@@ -92,7 +93,7 @@ void DrawContext::DrawCircle(Point2D p, float radius, RGBColor c) {
 
 
     // Set attributes
-    drawableCircle.setPosition(sf::Vector2f(p.x, p.y));
+    drawableCircle.setPosition(Point2DToVector(Transform(p)));
     drawableCircle.setFillColor(sf::Color (c.r, c.g, c.b));
 
     // Draw to window
